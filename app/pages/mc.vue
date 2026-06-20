@@ -207,6 +207,17 @@ const correctTeamsList = computed(() => {
   })
 })
 
+// Number of teams that have submitted an answer for the current question
+const currentQuestionSubmittedCount = computed(() => {
+  const prog = dataEntryProgress.value.find(p => p.question_number === selectedQuestion.value)
+  return prog ? prog.submitted_count : 0
+})
+
+// Whether all teams have submitted an answer for the current question
+const isCurrentQuestionFullySubmitted = computed(() => {
+  return teams.value.length > 0 && currentQuestionSubmittedCount.value === teams.value.length
+})
+
 const handleExit = () => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('staff_key')
@@ -328,10 +339,22 @@ const handleExit = () => {
         </div>
 
         <!-- Right: Correct Teams List -->
-        <div class="glass-card" style="min-height: 480px; display: flex; flex-direction: column;">
-          <h2 style="font-size: 1.3rem; margin-bottom: 1rem; color: var(--color-cyan); display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.75rem;">
-            <Award :size="22" style="color: var(--color-gold);" />
-            <span>ทีมที่ตอบถูกในข้อนี้ ({{ correctTeamsList.length }} ทีม)</span>
+        <div 
+          class="glass-card" 
+          :class="{ 'fully-submitted-card': isCurrentQuestionFullySubmitted }"
+          style="min-height: 480px; display: flex; flex-direction: column; transition: all 0.3s ease;"
+        >
+          <h2 style="font-size: 1.3rem; margin-bottom: 1rem; color: var(--color-cyan); display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <Award :size="22" style="color: var(--color-gold);" />
+              <span>ทีมที่ตอบถูกในข้อนี้ ({{ correctTeamsList.length }} ทีม)</span>
+            </div>
+            <div 
+              class="status-pill-custom"
+              :class="{ 'fully-submitted-pill': isCurrentQuestionFullySubmitted }"
+            >
+              คีย์แล้ว: {{ currentQuestionSubmittedCount }} / {{ teams.length }} ทีม
+            </div>
           </h2>
 
           <div v-if="correctTeamsList.length === 0" style="margin: auto; text-align: center; color: var(--text-secondary);">
@@ -339,20 +362,18 @@ const handleExit = () => {
             <p>ยังไม่มีทีมที่ตอบถูกในข้อนี้</p>
           </div>
 
-          <div v-else style="display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; flex: 1; max-height: 500px; padding-right: 0.5rem;">
+          <div v-else style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; overflow-y: auto; flex: 1; max-height: 500px; padding-right: 0.5rem; align-content: start;">
             <div 
               v-for="team in correctTeamsList" 
               :key="team.id"
               class="glass-card"
-              style="background: rgba(0, 230, 118, 0.05); border-color: rgba(0, 230, 118, 0.2); padding: 1.5rem 2.5rem; display: flex; align-items: center; justify-content: space-between;"
+              style="background: rgba(0, 230, 118, 0.05); border-color: rgba(0, 230, 118, 0.2); padding: 0.75rem 1.25rem; display: flex; align-items: center; justify-content: space-between; cursor: help;"
+              :title="team.name"
             >
-              <div style="display: flex; align-items: center; gap: 2rem; min-width: 0; flex: 1; overflow: hidden;">
-                <span style="font-family: var(--font-title); font-weight: 800; font-size: 2.6rem; color: var(--color-gold); text-shadow: var(--shadow-neon-cyan); flex-shrink: 0;">
-                  TEAM {{ String(team.team_number).padStart(2, '0') }}
-                </span>
-                <span style="font-size: 1.8rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;" :title="team.name">{{ team.name }}</span>
-              </div>
-              <CheckCircle :size="48" style="color: var(--color-success);" />
+              <span style="font-family: var(--font-title); font-weight: 800; font-size: 2.0rem; color: var(--color-gold); text-shadow: var(--shadow-neon-cyan);">
+                TEAM {{ String(team.team_number).padStart(2, '0') }}
+              </span>
+              <CheckCircle :size="28" style="color: var(--color-success); flex-shrink: 0;" />
             </div>
           </div>
         </div>
@@ -416,5 +437,43 @@ const handleExit = () => {
 }
 .loading-spin {
   animation: spin 1.2s linear infinite;
+}
+
+.fully-submitted-card {
+  border-color: var(--color-success) !important;
+  background: rgba(0, 230, 118, 0.04) !important;
+  box-shadow: 0 0 15px rgba(0, 230, 118, 0.1) !important;
+}
+
+:global(.light-theme) .fully-submitted-card {
+  background: rgba(46, 125, 50, 0.04) !important;
+  box-shadow: 0 0 15px rgba(46, 125, 50, 0.1) !important;
+}
+
+.status-pill-custom {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border: 1px solid var(--glass-border);
+  font-size: 0.85rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+:global(.light-theme) .status-pill-custom {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.fully-submitted-pill {
+  background: rgba(0, 230, 118, 0.15) !important;
+  color: var(--color-success) !important;
+  border-color: rgba(0, 230, 118, 0.3) !important;
+  font-weight: 700;
+}
+
+:global(.light-theme) .fully-submitted-pill {
+  background: rgba(46, 125, 50, 0.12) !important;
 }
 </style>

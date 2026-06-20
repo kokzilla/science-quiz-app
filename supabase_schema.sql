@@ -366,3 +366,179 @@ begin
 end;
 $$;
 
+-- ==========================================================================
+-- F. STAGE PRESENTER & QUESTION BANK MIGRATIONS
+-- ==========================================================================
+
+-- 1. Alter questions table to support text and slide-image questions
+alter table questions 
+add column if not exists question_text text,
+add column if not exists choice_a text,
+add column if not exists choice_b text,
+add column if not exists choice_c text,
+add column if not exists choice_d text,
+add column if not exists is_image_only boolean not null default false,
+add column if not exists question_image_url text,
+add column if not exists answer_image_url text;
+
+-- 2. Alter rounds table to support Stage Presenter state tracking
+alter table rounds 
+add column if not exists presenter_active_question integer not null default 1,
+add column if not exists presenter_show_state text not null default 'question', -- 'question', 'timer_start', 'answer_revealed', 'correct_teams'
+add column if not exists presenter_timer_started_at timestamp with time zone;
+
+-- 3. Add secure RPC function to update presenter state with passkey validation
+create or replace function update_presenter_state_secure(
+    p_round_id uuid,
+    p_active_question integer,
+    p_show_state text,
+    p_timer_started_at text, -- pass as ISO string or null
+    p_passkey text
+)
+returns boolean
+security definer
+language plpgsql
+as $$
+declare
+    admin_key text;
+begin
+    -- Verify Admin Passkey
+    select value into admin_key from system_settings where key = 'admin_passkey';
+    if p_passkey <> admin_key then
+        raise exception 'รหัสผ่านแอดมินไม่ถูกต้อง!';
+    end if;
+
+    -- Update round presenter state
+    update rounds
+    set 
+        presenter_active_question = p_active_question,
+        presenter_show_state = p_show_state,
+        presenter_timer_started_at = case when p_timer_started_at is not null then p_timer_started_at::timestamp with time zone else null end
+    where id = p_round_id;
+
+    return true;
+end;
+$$;
+
+-- 4. Add secure RPC to update or insert a single question (for the manual editor)
+create or replace function save_question_secure(
+    p_round_id uuid,
+    p_question_number integer,
+    p_correct_answer text,
+    p_is_image_only boolean,
+    p_question_text text,
+    p_choice_a text,
+    p_choice_b text,
+    p_choice_c text,
+    p_choice_d text,
+    p_question_image_url text,
+    p_answer_image_url text,
+    p_choices_layout text,
+    p_passkey text
+)
+returns boolean
+security definer
+language plpgsql
+as $$
+declare
+    admin_key text;
+begin
+    -- Verify Admin Passkey
+    select value into admin_key from system_settings where key = 'admin_passkey';
+    if p_passkey <> admin_key then
+        raise exception 'รหัสผ่านแอดมินไม่ถูกต้อง!';
+    end if;
+
+    -- Insert or update question
+    insert into questions (
+        round_id, question_number, correct_answer, 
+        is_image_only, question_text, choice_a, choice_b, choice_c, choice_d, 
+        question_image_url, answer_image_url, choices_layout
+    ) 
+    values (
+        p_round_id, p_question_number, p_correct_answer, 
+        p_is_image_only, p_question_text, p_choice_a, p_choice_b, p_choice_c, p_choice_d, 
+        p_question_image_url, p_answer_image_url, coalesce(p_choices_layout, '2_col')
+    )
+    on conflict (round_id, question_number) do update set
+        correct_answer = excluded.correct_answer,
+        is_image_only = excluded.is_image_only,
+        question_text = excluded.question_text,
+        choice_a = excluded.choice_a,
+        choice_b = excluded.choice_b,
+        choice_c = excluded.choice_c,
+        choice_d = excluded.choice_d,
+        question_image_url = excluded.question_image_url,
+        answer_image_url = excluded.answer_image_url,
+        choices_layout = excluded.choices_layout;
+
+    return true;
+end;
+$$;
+
+-- 5. Batch import questions secure
+create or replace function import_questions_secure(
+    p_round_id uuid,
+    p_questions jsonb, -- array of question objects
+    p_passkey text
+)
+returns boolean
+security definer
+language plpgsql
+as $$
+declare
+    admin_key text;
+    q_row jsonb;
+begin
+    -- Verify Admin Passkey
+    select value into admin_key from system_settings where key = 'admin_passkey';
+    if p_passkey <> admin_key then
+        raise exception 'รหัสผ่านแอดมินไม่ถูกต้อง!';
+    end if;
+
+    -- Upsert loop
+    for q_row in select * from jsonb_array_elements(p_questions) loop
+        insert into questions (
+            round_id, question_number, correct_answer, 
+            is_image_only, question_text, choice_a, choice_b, choice_c, choice_d, 
+            question_image_url, answer_image_url, choices_layout
+        ) 
+        values (
+            p_round_id, 
+            (q_row->>'question_number')::integer, 
+            q_row->>'correct_answer', 
+            (q_row->>'is_image_only')::boolean, 
+            q_row->>'question_text', 
+            q_row->>'choice_a', 
+            q_row->>'choice_b', 
+            q_row->>'choice_c', 
+            q_row->>'choice_d', 
+            q_row->>'question_image_url', 
+            q_row->>'answer_image_url',
+            coalesce(q_row->>'choices_layout', '2_col')
+        )
+        on conflict (round_id, question_number) do update set
+            correct_answer = excluded.correct_answer,
+            is_image_only = excluded.is_image_only,
+            question_text = excluded.question_text,
+            choice_a = excluded.choice_a,
+            choice_b = excluded.choice_b,
+            choice_c = excluded.choice_c,
+            choice_d = excluded.choice_d,
+            question_image_url = excluded.question_image_url,
+            answer_image_url = excluded.answer_image_url,
+            choices_layout = excluded.choices_layout;
+    end loop;
+
+    return true;
+end;
+$$;
+
+-- 6. Add choices_layout column to questions table
+alter table questions 
+add column if not exists choices_layout text not null default '2_col';
+
+-- Notify schema reload
+notify pgrst, 'reload schema';
+
+

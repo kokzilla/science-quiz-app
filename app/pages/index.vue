@@ -10,7 +10,8 @@ import {
   Award,
   AlertCircle,
   Key,
-  Database
+  Database,
+  Presentation
 } from 'lucide-vue-next'
 
 const router = useRouter()
@@ -22,7 +23,7 @@ const loadingRounds = ref(false)
 // Portal authorization state
 const selectedRound = ref<any>(null)
 const showPasskeyModal = ref(false)
-const targetRole = ref<'admin' | 'staff' | 'mc' | 'reports'>('staff')
+const targetRole = ref<'admin' | 'staff' | 'mc' | 'reports' | 'presenter-admin'>('staff')
 const enteredPasskey = ref('')
 const passkeyError = ref('')
 const passkeyChecking = ref(false)
@@ -57,22 +58,27 @@ const handleRoundSelect = (round: any) => {
   selectedRound.value = round
 }
 
-const openPortal = async (role: 'admin' | 'staff' | 'mc' | 'reports') => {
+const openPortal = async (role: 'admin' | 'staff' | 'mc' | 'reports' | 'presenter' | 'presenter-admin') => {
   if (!supabase.value || !selectedRound.value) return
   
-  targetRole.value = role
   passkeyError.value = ''
   enteredPasskey.value = ''
 
-  // If it's the TV Scoreboard, go directly (no password)
+  // If it's a public page, go directly (no password)
   if (role as any === 'scoreboard') {
     window.open(`/scoreboard?round=${selectedRound.value.id}`, '_blank')
     return
   }
+  if (role as any === 'presenter') {
+    window.open(`/presenter?round=${selectedRound.value.id}`, '_blank')
+    return
+  }
+
+  targetRole.value = role as any
 
   // Check if we already have a valid passkey in localStorage
   let savedKey = ''
-  if (role === 'admin') {
+  if (role === 'admin' || role === 'presenter-admin') {
     savedKey = localStorage.getItem('admin_passkey') || ''
   } else {
     // staff, mc, reports can use staff_key (or admin_passkey as superuser)
@@ -81,11 +87,12 @@ const openPortal = async (role: 'admin' | 'staff' | 'mc' | 'reports') => {
 
   if (savedKey) {
     // Quick test if saved key is valid
-    const isValid = await verifyPasskeyOnServer(role === 'admin' ? 'admin' : 'staff', savedKey)
-    const isAdminValid = role !== 'admin' ? await verifyPasskeyOnServer('admin', savedKey) : false
+    const checkRole = (role === 'admin' || role === 'presenter-admin') ? 'admin' : 'staff'
+    const isValid = await verifyPasskeyOnServer(checkRole, savedKey)
+    const isAdminValid = checkRole !== 'admin' ? await verifyPasskeyOnServer('admin', savedKey) : false
     
     if (isValid || isAdminValid) {
-      navigateToRole(role, selectedRound.value.id)
+      navigateToRole(role as any, selectedRound.value.id)
       return
     }
   }
@@ -124,7 +131,7 @@ const handlePasskeySubmit = async () => {
   passkeyError.value = ''
 
   try {
-    const checkRole = targetRole.value === 'admin' ? 'admin' : 'staff'
+    const checkRole = (targetRole.value === 'admin' || targetRole.value === 'presenter-admin') ? 'admin' : 'staff'
     let isValid = await verifyPasskeyOnServer(checkRole, enteredPasskey.value)
     
     // Admin passkey can bypass staff checks
@@ -164,7 +171,7 @@ const handlePasskeySubmit = async () => {
   }
 }
 
-const navigateToRole = (role: 'admin' | 'staff' | 'mc' | 'reports', roundId: string) => {
+const navigateToRole = (role: 'admin' | 'staff' | 'mc' | 'reports' | 'presenter-admin', roundId: string) => {
   if (role === 'admin') {
     router.push(`/admin?round=${roundId}`)
   } else if (role === 'staff') {
@@ -173,6 +180,8 @@ const navigateToRole = (role: 'admin' | 'staff' | 'mc' | 'reports', roundId: str
     router.push(`/mc?round=${roundId}`)
   } else if (role === 'reports') {
     router.push(`/reports?round=${roundId}`)
+  } else if (role === 'presenter-admin') {
+    router.push(`/presenter-admin?round=${roundId}`)
   }
 }
 
@@ -256,7 +265,7 @@ const createDemoData = async () => {
     <!-- DB Unconfigured State Warning -->
     <div v-if="!isConfigured" class="glass-card" style="max-width: 600px; margin: 0 auto; text-align: center; padding: 3rem;">
       <AlertCircle class="text-error" :size="64" style="margin-bottom: 1.5rem;" />
-      <h2 style="font-size: 1.5rem; color: #fff; margin-bottom: 1rem;">ตรวจพบการตั้งค่าฐานข้อมูลไม่ถูกต้อง</h2>
+      <h2 style="font-size: 1.5rem; color: var(--text-primary); margin-bottom: 1rem;">ตรวจพบการตั้งค่าฐานข้อมูลไม่ถูกต้อง</h2>
       <p style="color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.6;">
         กรุณาตรวจสอบว่ามีไฟล์ <strong style="color:var(--color-cyan)">.env</strong> ในโฟลเดอร์หลักของโปรแกรม และระบุค่า <strong style="color:var(--color-cyan)">SUPABASE_URL</strong> และ <strong style="color:var(--color-cyan)">SUPABASE_KEY</strong> ครบถ้วนแล้ว จากนั้นรีสตาร์ทเซิร์ฟเวอร์
       </p>
@@ -296,7 +305,7 @@ const createDemoData = async () => {
           >
             <div style="display: flex; justify-content: space-between; align-items: center;">
               <div>
-                <h3 style="font-size: 1.15rem; color: #fff;">{{ round.name }}</h3>
+                <h3 style="font-size: 1.15rem; color: var(--text-primary);">{{ round.name }}</h3>
                 <p style="font-size: 0.85rem; color: var(--text-secondary);">วันที่แข่ง: {{ round.date }}</p>
               </div>
               <span class="status-pill" :class="round.status">
@@ -321,15 +330,33 @@ const createDemoData = async () => {
         <div v-else style="display: flex; flex-direction: column; gap: 1rem;">
           <div style="background: rgba(0, 229, 255, 0.05); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid rgba(0, 229, 255, 0.15); margin-bottom: 0.5rem;">
             <span style="font-size: 0.8rem; color: var(--text-secondary); display: block;">รอบการแข่งขันที่เลือก:</span>
-            <strong style="font-size: 1.2rem; color: #fff;">{{ selectedRound.name }}</strong>
+            <strong style="font-size: 1.2rem; color: var(--text-primary);">{{ selectedRound.name }}</strong>
           </div>
 
           <!-- Scoreboard TV Portal (Public, no password) -->
           <div @click="openPortal('scoreboard' as any)" class="glass-card portal-item" style="background: rgba(0, 229, 255, 0.03); display: flex; align-items: center; gap: 1rem; padding: 1.1rem; cursor: pointer;">
             <Tv :size="24" style="color: var(--color-cyan);" />
             <div style="flex: 1;">
-              <h3 style="font-size: 1.15rem; color: #fff;">หน้าจอถ่ายทอดสด TV Scoreboard</h3>
+              <h3 style="font-size: 1.15rem; color: var(--text-primary);">หน้าจอถ่ายทอดสด TV Scoreboard</h3>
               <p style="font-size: 0.85rem; color: var(--text-secondary);">เปิดแสดงผลจัดอันดับบนจอทีวีขนาดใหญ่ (สาธารณะ ไม่ต้องระบุรหัสผ่าน)</p>
+            </div>
+          </div>
+
+          <!-- Stage Presenter Portal (Public, no password) -->
+          <div @click="openPortal('presenter' as any)" class="glass-card portal-item" style="background: rgba(0, 229, 255, 0.03); display: flex; align-items: center; gap: 1rem; padding: 1.1rem; cursor: pointer;">
+            <Presentation :size="24" style="color: var(--color-cyan);" />
+            <div style="flex: 1;">
+              <h3 style="font-size: 1.15rem; color: var(--text-primary);">หน้าจอเวที LED (Stage Presentation)</h3>
+              <p style="font-size: 0.85rem; color: var(--text-secondary);">เปิดแสดงโจทย์คำถาม ตัวเลือก เฉลย และจับเวลาบนจอเวทีหลัก (ไม่ต้องระบุรหัสผ่าน)</p>
+            </div>
+          </div>
+
+          <!-- Stage Admin Controller Portal (Admin Password) -->
+          <div @click="openPortal('presenter-admin' as any)" class="glass-card portal-item" style="display: flex; align-items: center; gap: 1rem; padding: 1.1rem; cursor: pointer;">
+            <Sliders :size="24" style="color: var(--color-cyan);" />
+            <div style="flex: 1;">
+              <h3 style="font-size: 1.15rem; color: var(--text-primary);">แผงควบคุมหน้าจอเวที (Stage Admin Panel)</h3>
+              <p style="font-size: 0.85rem; color: var(--text-secondary);">ปุ่มควบคุมการจับเวลา เฉลยข้อคำถาม และเปลี่ยนสถานะหน้าจอ LED ใหญ่ (ใช้รหัสผ่านแอดมิน)</p>
             </div>
           </div>
 
@@ -337,7 +364,7 @@ const createDemoData = async () => {
           <div @click="openPortal('mc')" class="glass-card portal-item" style="display: flex; align-items: center; gap: 1rem; padding: 1.1rem; cursor: pointer;">
             <Award :size="24" style="color: var(--color-gold);" />
             <div style="flex: 1;">
-              <h3 style="font-size: 1.15rem; color: #fff;">หน้าจอผู้ดำเนินรายการ (MC Screen)</h3>
+              <h3 style="font-size: 1.15rem; color: var(--text-primary);">หน้าจอผู้ดำเนินรายการ (MC Screen)</h3>
               <p style="font-size: 0.85rem; color: var(--text-secondary);">แสดงรายชื่อทีมที่ตอบถูกเรียบลไทม์รายข้อ (สงวนเฉพาะพิธีกร/เจ้าหน้าที่)</p>
             </div>
           </div>
@@ -346,7 +373,7 @@ const createDemoData = async () => {
           <div @click="openPortal('staff')" class="glass-card portal-item" style="display: flex; align-items: center; gap: 1rem; padding: 1.1rem; cursor: pointer;">
             <Users :size="24" style="color: var(--color-success);" />
             <div style="flex: 1;">
-              <h3 style="font-size: 1.15rem; color: #fff;">เจ้าหน้าที่บันทึกข้อมูล (Staff Input)</h3>
+              <h3 style="font-size: 1.15rem; color: var(--text-primary);">เจ้าหน้าที่บันทึกข้อมูล (Staff Input)</h3>
               <p style="font-size: 0.85rem; color: var(--text-secondary);">คีย์ตัวเลือกคำตอบ ก-ง จากกระดาษคำตอบส่งเข้าฐานข้อมูล</p>
             </div>
           </div>
@@ -355,7 +382,7 @@ const createDemoData = async () => {
           <div @click="openPortal('admin')" class="glass-card portal-item" style="display: flex; align-items: center; gap: 1rem; padding: 1.1rem; cursor: pointer;">
             <Sliders :size="24" style="color: var(--color-purple);" />
             <div style="flex: 1;">
-              <h3 style="font-size: 1.15rem; color: #fff;">ระบบควบคุมหลักของแอดมิน (Admin Panel)</h3>
+              <h3 style="font-size: 1.15rem; color: var(--text-primary);">ระบบควบคุมหลักของแอดมิน (Admin Panel)</h3>
               <p style="font-size: 0.85rem; color: var(--text-secondary);">จัดการรายชื่อทีม ตั้งค่าเฉลย ควบคุม Reveal ปล่อยคะแนน และจัดการไทเบรก</p>
             </div>
           </div>
@@ -364,7 +391,7 @@ const createDemoData = async () => {
           <div @click="openPortal('reports')" class="glass-card portal-item" style="display: flex; align-items: center; gap: 1rem; padding: 1.1rem; cursor: pointer;">
             <BarChart3 :size="24" style="color: var(--color-warning);" />
             <div style="flex: 1;">
-              <h3 style="font-size: 1.15rem; color: #fff;">รายงานผลการแข่งขัน (Reports & Stats)</h3>
+              <h3 style="font-size: 1.15rem; color: var(--text-primary);">รายงานผลการแข่งขัน (Reports & Stats)</h3>
               <p style="font-size: 0.85rem; color: var(--text-secondary);">ดูตารางคะแนนโดยละเอียด สถิติวิเคราะห์รายข้อข้อสอบ และสั่งพิมพ์ PDF</p>
             </div>
           </div>
@@ -379,7 +406,7 @@ const createDemoData = async () => {
         
         <div style="text-align: center; margin-bottom: 1.5rem;">
           <Key class="text-cyan" :size="48" style="margin-bottom: 0.75rem; filter: drop-shadow(0 0 5px rgba(0,229,255,0.3));" />
-          <h3 style="font-size: 1.25rem; color: #fff; margin-bottom: 0.25rem;">
+          <h3 style="font-size: 1.25rem; color: var(--text-primary); margin-bottom: 0.25rem;">
             ระบุรหัสผ่านเข้าใช้งาน
           </h3>
           <p style="color: var(--text-secondary); font-size: 0.85rem;">

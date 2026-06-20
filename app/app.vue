@@ -8,7 +8,7 @@ const route = useRoute()
 const { initTheme } = useTheme()
 
 const showNavbar = computed(() => {
-  return route.path !== '/scoreboard'
+  return route.path !== '/scoreboard' && route.path !== '/presenter'
 })
 
 onMounted(() => {

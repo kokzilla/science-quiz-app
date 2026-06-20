@@ -13,7 +13,9 @@ import {
   RefreshCw, 
   Grid,
   FileSpreadsheet,
-  LogOut
+  LogOut,
+  Upload,
+  Database
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -26,8 +28,8 @@ const roundsList = ref<any[]>([])
 const currentRound = ref<any>(null)
 const adminPasskey = ref('')
 
-// Tab state: 'teams' | 'questions' | 'reveal' | 'progress'
-const activeTab = ref<'teams' | 'questions' | 'reveal' | 'progress'>('teams')
+// Tab state: 'teams' | 'questions' | 'reveal' | 'progress' | 'bank'
+const activeTab = ref<'teams' | 'questions' | 'reveal' | 'progress' | 'bank'>('teams')
 
 // Teams State
 const teams = ref<any[]>([])
@@ -529,6 +531,314 @@ const handleLogout = () => {
   }
   router.push('/')
 }
+
+// ==========================================
+// QUESTION BANK MANAGEMENT
+// ==========================================
+const selectedQuestionNumber = ref(1)
+const questionForm = ref({
+  correct_answer: 'ก',
+  is_image_only: false,
+  question_text: '',
+  choice_a: '',
+  choice_b: '',
+  choice_c: '',
+  choice_d: '',
+  question_image_url: '',
+  answer_image_url: '',
+  choices_layout: '2_col'
+})
+
+const loadQuestionForm = () => {
+  const existing = questions.value.find(q => q.question_number === selectedQuestionNumber.value)
+  if (existing) {
+    questionForm.value = {
+      correct_answer: existing.correct_answer || 'ก',
+      is_image_only: !!existing.is_image_only,
+      question_text: existing.question_text || '',
+      choice_a: existing.choice_a || '',
+      choice_b: existing.choice_b || '',
+      choice_c: existing.choice_c || '',
+      choice_d: existing.choice_d || '',
+      question_image_url: existing.question_image_url || '',
+      answer_image_url: existing.answer_image_url || '',
+      choices_layout: existing.choices_layout || '2_col'
+    }
+  } else {
+    questionForm.value = {
+      correct_answer: 'ก',
+      is_image_only: false,
+      question_text: '',
+      choice_a: '',
+      choice_b: '',
+      choice_c: '',
+      choice_d: '',
+      question_image_url: '',
+      answer_image_url: '',
+      choices_layout: '2_col'
+    }
+  }
+}
+
+watch([selectedQuestionNumber, questions], loadQuestionForm, { immediate: true })
+
+const isSavingQuestion = ref(false)
+const handleSaveQuestion = async () => {
+  if (!supabase.value || !selectedRoundId.value) return
+  if (!adminPasskey.value) {
+    alert('กรุณากรอกรหัสผ่านแอดมินก่อนดำเนินการ')
+    return
+  }
+  isSavingQuestion.value = true
+  try {
+    const { error } = await supabase.value.rpc('save_question_secure', {
+      p_round_id: selectedRoundId.value,
+      p_question_number: selectedQuestionNumber.value,
+      p_correct_answer: questionForm.value.correct_answer,
+      p_is_image_only: questionForm.value.is_image_only,
+      p_question_text: questionForm.value.question_text,
+      p_choice_a: questionForm.value.choice_a,
+      p_choice_b: questionForm.value.choice_b,
+      p_choice_c: questionForm.value.choice_c,
+      p_choice_d: questionForm.value.choice_d,
+      p_question_image_url: questionForm.value.question_image_url,
+      p_answer_image_url: questionForm.value.answer_image_url,
+      p_choices_layout: questionForm.value.choices_layout,
+      p_passkey: adminPasskey.value
+    })
+    if (error) throw error
+    alert('บันทึกข้อมูลคำถามสำเร็จ!')
+    await fetchQuestions()
+  } catch (err: any) {
+    alert(`เกิดข้อผิดพลาดในการบันทึก: ${err.message}`)
+  } finally {
+    isSavingQuestion.value = false
+  }
+}
+
+const handleImageUpload = async (event: Event, targetField: 'question_image_url' | 'answer_image_url') => {
+  const input = event.target as HTMLInputElement
+  if (!input.files || input.files.length === 0) return
+
+  const file = input.files[0]
+  const formData = new FormData()
+  formData.append('file', file)
+
+  try {
+    const res = await $fetch<{ success: boolean; url: string }>('/api/upload', {
+      method: 'POST',
+      body: formData
+    })
+
+    if (res.success && res.url) {
+      questionForm.value[targetField] = res.url
+      alert('อัพโหลดรูปภาพสำเร็จแล้ว!')
+    }
+  } catch (err: any) {
+    console.error('Upload error:', err)
+    alert(`อัพโหลดรูปภาพล้มเหลว: ${err.message || err}`)
+  } finally {
+    // Reset file input value so same file can be selected again
+    input.value = ''
+  }
+}
+
+const parseCSV = (text: string) => {
+  const lines = [];
+  let row = [""];
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const nextChar = text[i+1];
+    if (char === '"') {
+      if (inQuotes && nextChar === '"') {
+        row[row.length - 1] += '"';
+        i++; // skip next quote
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      row.push("");
+    } else if ((char === '\r' || char === '\n') && !inQuotes) {
+      if (char === '\r' && nextChar === '\n') {
+        i++;
+      }
+      lines.push(row);
+      row = [""];
+    } else {
+      row[row.length - 1] += char;
+    }
+  }
+  if (row.length > 1 || row[0] !== "") {
+    lines.push(row);
+  }
+  return lines;
+}
+
+const isImportingCSV = ref(false)
+const handleCSVImport = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  if (!supabase.value || !selectedRoundId.value) return
+  if (!adminPasskey.value) {
+    alert('กรุณากรอกรหัสผ่านแอดมินก่อนดำเนินการ')
+    return
+  }
+
+  isImportingCSV.value = true
+  const reader = new FileReader()
+  
+  reader.onload = async (e) => {
+    const text = e.target?.result as string
+    if (!text) {
+      isImportingCSV.value = false;
+      return
+    }
+
+    try {
+      const csvLines = parseCSV(text)
+      if (csvLines.length < 2) {
+        throw new Error('ไฟล์ CSV ไม่มีข้อมูลเพียงพอ หรือว่างเปล่า')
+      }
+
+      // Parse headers
+      const rawHeaders = csvLines[0];
+      const headers = rawHeaders.map(h => h.trim().toLowerCase());
+      
+      const expectedFields = [
+        'question_number', 'correct_answer', 'is_image_only', 
+        'question_text', 'choice_a', 'choice_b', 'choice_c', 'choice_d', 
+        'question_image_url', 'answer_image_url'
+      ];
+      
+      const indexMap: Record<string, number> = {};
+      expectedFields.forEach(field => {
+        const idx = headers.indexOf(field);
+        if (idx !== -1) {
+          indexMap[field] = idx;
+        }
+      });
+
+      // If headers are missing or not matching expected format, fallback to default order
+      const hasHeaders = expectedFields.some(f => indexMap[f] !== undefined);
+      
+      const startIndex = hasHeaders ? 1 : 0;
+      const dataRows = csvLines.slice(startIndex).filter(row => row.length > 1 || (row.length === 1 && row[0] !== ''));
+
+      // Add 'choices_layout' to parsed expected fields if it exists in CSV headers
+      const csvExpectedFields = [
+        'question_number', 'correct_answer', 'is_image_only', 
+        'question_text', 'choice_a', 'choice_b', 'choice_c', 'choice_d', 
+        'question_image_url', 'answer_image_url', 'choices_layout'
+      ];
+      
+      const csvIndexMap: Record<string, number> = {};
+      csvExpectedFields.forEach(field => {
+        const idx = headers.indexOf(field);
+        if (idx !== -1) {
+          csvIndexMap[field] = idx;
+        }
+      });
+      const csvHasHeaders = csvExpectedFields.some(f => csvIndexMap[f] !== undefined);
+      const csvStartIndex = csvHasHeaders ? 1 : 0;
+      const csvDataRows = csvLines.slice(csvStartIndex).filter(row => row.length > 1 || (row.length === 1 && row[0] !== ''));
+
+      const parsedQuestions = csvDataRows.map((row, lineNum) => {
+        let qNum = lineNum + 1;
+        let correctAns = 'ก';
+        let isImg = false;
+        let textVal = '';
+        let cA = '';
+        let cB = '';
+        let cC = '';
+        let cD = '';
+        let qImg = '';
+        let aImg = '';
+        let layoutVal = '2_col';
+
+        if (csvHasHeaders) {
+          if (csvIndexMap['question_number'] !== undefined) qNum = parseInt(row[csvIndexMap['question_number']]) || qNum;
+          if (csvIndexMap['correct_answer'] !== undefined) correctAns = (row[csvIndexMap['correct_answer']] || 'ก').trim();
+          if (csvIndexMap['is_image_only'] !== undefined) {
+            const val = (row[csvIndexMap['is_image_only']] || '').trim().toLowerCase();
+            isImg = val === 'true' || val === '1' || val === 'yes';
+          }
+          if (csvIndexMap['question_text'] !== undefined) textVal = row[csvIndexMap['question_text']] || '';
+          if (csvIndexMap['choice_a'] !== undefined) cA = row[csvIndexMap['choice_a']] || '';
+          if (csvIndexMap['choice_b'] !== undefined) cB = row[csvIndexMap['choice_b']] || '';
+          if (csvIndexMap['choice_c'] !== undefined) cC = row[csvIndexMap['choice_c']] || '';
+          if (csvIndexMap['choice_d'] !== undefined) cD = row[csvIndexMap['choice_d']] || '';
+          if (csvIndexMap['question_image_url'] !== undefined) qImg = row[csvIndexMap['question_image_url']] || '';
+          if (csvIndexMap['answer_image_url'] !== undefined) aImg = row[csvIndexMap['answer_image_url']] || '';
+          if (csvIndexMap['choices_layout'] !== undefined) {
+            const val = (row[csvIndexMap['choices_layout']] || '').trim().toLowerCase();
+            layoutVal = val === '1_col' || val === '1' || val === '1_column' ? '1_col' : '2_col';
+          }
+        } else {
+          // Default positional fallback
+          qNum = parseInt(row[0]) || qNum;
+          correctAns = (row[1] || 'ก').trim();
+          const val = (row[2] || '').trim().toLowerCase();
+          isImg = val === 'true' || val === '1' || val === 'yes';
+          textVal = row[3] || '';
+          cA = row[4] || '';
+          cB = row[5] || '';
+          cC = row[6] || '';
+          cD = row[7] || '';
+          qImg = row[8] || '';
+          aImg = row[9] || '';
+          if (row[10]) {
+            const lVal = row[10].trim().toLowerCase();
+            layoutVal = lVal === '1_col' || lVal === '1' || lVal === '1_column' ? '1_col' : '2_col';
+          }
+        }
+
+        // Validate choice
+        if (!['ก', 'ข', 'ค', 'ง'].includes(correctAns)) {
+          correctAns = 'ก';
+        }
+
+        return {
+          question_number: qNum,
+          correct_answer: correctAns,
+          is_image_only: isImg,
+          question_text: textVal,
+          choice_a: cA,
+          choice_b: cB,
+          choice_c: cC,
+          choice_d: cD,
+          question_image_url: qImg,
+          answer_image_url: aImg,
+          choices_layout: layoutVal
+        };
+      });
+
+      if (parsedQuestions.length === 0) {
+        throw new Error('ไม่พบข้อมูลข้อสอบที่จะนำเข้า');
+      }
+
+      // Import to database
+      const { error } = await supabase.value.rpc('import_questions_secure', {
+        p_round_id: selectedRoundId.value,
+        p_questions: parsedQuestions,
+        p_passkey: adminPasskey.value
+      });
+
+      if (error) throw error;
+      alert(`นำเข้าคลังข้อสอบสำเร็จ จำนวน ${parsedQuestions.length} ข้อ!`);
+      await fetchQuestions();
+    } catch (err: any) {
+      alert(`ข้อผิดพลาดการนำเข้าคลังข้อสอบ: ${err.message}`);
+    } finally {
+      isImportingCSV.value = false;
+      target.value = '';
+    }
+  };
+
+  reader.readAsText(file);
+}
 </script>
 
 <template>
@@ -644,6 +954,16 @@ const handleLogout = () => {
         >
           <Grid :size="16" />
           ความคืบหน้าการคีย์ข้อมูล
+        </button>
+
+        <button 
+          @click="activeTab = 'bank'" 
+          class="btn" 
+          :style="activeTab === 'bank' ? 'border-bottom: 2px solid var(--color-cyan); color: var(--color-cyan); font-weight: 700;' : 'color: var(--text-secondary);'"
+          style="border-radius: 0; background: none; box-shadow: none;"
+        >
+          <Database :size="16" />
+          คลังข้อสอบ (Question Bank)
         </button>
       </div>
 
@@ -889,6 +1209,245 @@ const handleLogout = () => {
           </div>
         </div>
       </div>
+
+      <!-- Tab Content: Question Bank (CSV Import & Manual Editor) -->
+      <div v-if="activeTab === 'bank'">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
+          
+          <!-- CSV Import section -->
+          <div class="glass-card" style="background: rgba(255,255,255,0.02); display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <h3 style="margin-bottom: 0.5rem; font-size: 1.2rem; color: var(--color-cyan); display: flex; align-items: center; gap: 0.5rem;">
+                <FileSpreadsheet :size="20" />
+                <span>นำเข้าคลังข้อสอบผ่านไฟล์ CSV</span>
+              </h3>
+              <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem; line-height: 1.5;">
+                คุณสามารถนำเข้าคำถามและเฉลยแบบกลุ่ม 20 ข้อ โดยสร้างไฟล์ CSV ที่มีส่วนหัว (Header) หรือเรียงลำดับคอลัมน์ดังนี้:
+              </p>
+              <div style="background: rgba(0,0,0,0.2); padding: 0.75rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-family: monospace; color: var(--text-secondary); margin-bottom: 1rem; border: 1px solid var(--glass-border); line-height: 1.4; overflow-x: auto; white-space: nowrap;">
+                question_number, correct_answer, is_image_only, question_text, choice_a, choice_b, choice_c, choice_d, question_image_url, answer_image_url
+              </div>
+              <ul style="font-size: 0.8rem; color: var(--text-secondary); margin-left: 1.2rem; margin-bottom: 1.5rem; line-height: 1.4;">
+                <li><strong style="color: #fff;">question_number:</strong> 1 ถึง 20</li>
+                <li><strong style="color: #fff;">correct_answer:</strong> ก, ข, ค, หรือ ง</li>
+                <li><strong style="color: #fff;">is_image_only:</strong> true (ใช้สไลด์เต็มหน้าจอ) หรือ false (แสดงตัวหนังสือปกติ)</li>
+                <li><strong style="color: #fff;">question_image_url / answer_image_url:</strong> พาธไฟล์รูป เช่น <code style="color:var(--color-cyan)">/questions/q1_question.png</code> หรือ URL</li>
+              </ul>
+            </div>
+            
+            <div>
+              <input 
+                type="file" 
+                accept=".csv" 
+                @change="handleCSVImport" 
+                class="form-input" 
+                style="display: none;" 
+                id="csv-bank-input" 
+                :disabled="isImportingCSV"
+              />
+              <label 
+                for="csv-bank-input" 
+                class="btn btn-secondary" 
+                style="display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; cursor: pointer; width: 100%; height: 46px; font-weight: 600;"
+              >
+                <Upload :size="16" />
+                <span>{{ isImportingCSV ? 'กำลังนำเข้าไฟล์...' : 'เลือกไฟล์ CSV และเริ่มนำเข้า' }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Quick instructions or active status -->
+          <div class="glass-card" style="background: rgba(255,255,255,0.02); display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <h3 style="margin-bottom: 0.5rem; font-size: 1.2rem; color: var(--color-gold); display: flex; align-items: center; gap: 0.5rem;">
+                <BookOpen :size="20" />
+                <span>รายละเอียดข้อมูลรอบปัจจุบัน</span>
+              </h3>
+              <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.5rem;">
+                คลังข้อสอบนี้จะผูกกับรอบการแข่งขันที่เลือกอยู่ เมื่อเจ้าหน้าที่หรือ mc มีการเปลี่ยนสถานะ หน้าจอเวที LED จะทำการดึงข้อมูลเหล่านี้ไปแสดงผลแบบเรียลไทม์
+              </p>
+              
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; text-align: center;">
+                <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--glass-border); padding: 0.75rem; border-radius: var(--radius-sm);">
+                  <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">คำถามที่กำหนดแล้ว</span>
+                  <span style="font-family: var(--font-title); font-size: 1.5rem; font-weight: 800; color: var(--color-cyan);">
+                    {{ questions.length }} ข้อ
+                  </span>
+                </div>
+                <div style="background: rgba(255,255,255,0.01); border: 1px solid var(--glass-border); padding: 0.75rem; border-radius: var(--radius-sm);">
+                  <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">โหมดใช้สไลด์ภาพ</span>
+                  <span style="font-family: var(--font-title); font-size: 1.5rem; font-weight: 800; color: var(--color-purple);">
+                    {{ questions.filter(q => q.is_image_only).length }} ข้อ
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; border-top: 1px solid var(--glass-border); padding-top: 1rem; margin-top: 1rem;">
+              * การอัปโหลดไฟล์ใหม่ทับ จะทำการอัปเดตข้อมูลข้อสอบเดิมที่ข้อตรงกัน
+            </div>
+          </div>
+        </div>
+
+        <!-- Manual Editor Section -->
+        <div class="glass-card" style="background: rgba(255,255,255,0.01); border-color: rgba(255,255,255,0.05); padding: 2rem;">
+          <h3 style="margin-bottom: 1.5rem; font-size: 1.25rem; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+            <span>แก้ไขข้อมูลคำถามรายข้อ (Manual Question Editor)</span>
+          </h3>
+
+          <div style="display: grid; grid-template-columns: 240px 1fr; gap: 2rem;">
+            <!-- Left side: Q1-Q20 side selector buttons -->
+            <div style="display: flex; flex-direction: column; gap: 0.4rem; max-height: 520px; overflow-y: auto; padding-right: 0.5rem;">
+              <button
+                v-for="i in 20"
+                :key="i"
+                @click="selectedQuestionNumber = i"
+                class="btn"
+                :class="selectedQuestionNumber === i ? 'btn-primary' : 'btn-secondary'"
+                style="justify-content: space-between; font-weight: 600; width: 100%; text-align: left; padding: 0.6rem 1rem;"
+              >
+                <span>ข้อที่ {{ String(i).padStart(2, '0') }}</span>
+                <span style="font-size: 0.75rem; opacity: 0.8;">
+                  {{ questions.some(q => q.question_number === i) ? (questions.find(q => q.question_number === i)?.is_image_only ? 'สไลด์' : 'เฉลย ' + questions.find(q => q.question_number === i)?.correct_answer) : 'ยังไม่มีข้อมูล' }}
+                </span>
+              </button>
+            </div>
+
+            <!-- Right side: Form -->
+            <div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; align-items: center;">
+                <div>
+                  <label class="form-label">คำตอบที่ถูกต้อง (Correct Answer)</label>
+                  <select v-model="questionForm.correct_answer" class="form-input">
+                    <option value="ก">ตัวเลือก ก</option>
+                    <option value="ข">ตัวเลือก ข</option>
+                    <option value="ค">ตัวเลือก ค</option>
+                    <option value="ง">ตัวเลือก ง</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="form-label">รูปแบบแสดงคำตอบ (Choices Layout)</label>
+                  <select v-model="questionForm.choices_layout" class="form-input">
+                    <option value="2_col">2 คอลัมน์ (2 Columns - Default)</option>
+                    <option value="1_col">1 คอลัมน์ (1 Column)</option>
+                  </select>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 0.5rem; padding-top: 1.5rem;">
+                  <input
+                    type="checkbox"
+                    id="is-image-only-checkbox"
+                    v-model="questionForm.is_image_only"
+                    style="width: 18px; height: 18px; accent-color: var(--color-cyan); cursor: pointer;"
+                  />
+                  <label for="is-image-only-checkbox" style="color: #fff; font-weight: 600; cursor: pointer; user-select: none;">
+                    ใช้โหมดสไลด์รูปภาพเต็มจอ
+                  </label>
+                </div>
+              </div>
+
+              <!-- Conditional Fields based on is_image_only -->
+              <div v-if="!questionForm.is_image_only" style="display: flex; flex-direction: column; gap: 1.2rem; margin-bottom: 1.5rem; animation: fadeIn 0.2s ease-out;">
+                <div>
+                  <label class="form-label">โจทย์คำถาม (Question Text)</label>
+                  <textarea
+                    v-model="questionForm.question_text"
+                    rows="3"
+                    class="form-input"
+                    placeholder="พิมพ์โจทย์คำถามที่ต้องการแสดงบนเวที..."
+                  ></textarea>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                  <div>
+                    <label class="form-label">ตัวเลือก ก (Choice A)</label>
+                    <input v-model="questionForm.choice_a" type="text" class="form-input" placeholder="ตัวเลือก ก" />
+                  </div>
+                  <div>
+                    <label class="form-label">ตัวเลือก ข (Choice B)</label>
+                    <input v-model="questionForm.choice_b" type="text" class="form-input" placeholder="ตัวเลือก ข" />
+                  </div>
+                  <div>
+                    <label class="form-label">ตัวเลือก ค (Choice C)</label>
+                    <input v-model="questionForm.choice_c" type="text" class="form-input" placeholder="ตัวเลือก ค" />
+                  </div>
+                  <div>
+                    <label class="form-label">ตัวเลือก ง (Choice D)</label>
+                    <input v-model="questionForm.choice_d" type="text" class="form-input" placeholder="ตัวเลือก ง" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Image fields -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+                <div>
+                  <label class="form-label">พาธรูปภาพคำถาม (Question Image URL)</label>
+                  <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <input
+                      v-model="questionForm.question_image_url"
+                      type="text"
+                      class="form-input"
+                      style="flex: 1;"
+                      placeholder="เช่น /questions/q1_question.png (หรือปล่อยว่าง)"
+                    />
+                    <label class="btn btn-secondary" style="margin: 0; padding: 0 1rem; height: 42px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.85rem; font-weight: 600; white-space: nowrap; flex-shrink: 0; border-radius: var(--radius-sm);">
+                      อัพโหลด
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        style="display: none;" 
+                        @change="(e) => handleImageUpload(e, 'question_image_url')"
+                      />
+                    </label>
+                  </div>
+                  <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">
+                    * สำหรับแสดงแผนภาพ แผนภูมิ หรือสไลด์รูปคำถาม
+                  </span>
+                </div>
+                <div>
+                  <label class="form-label">พาธรูปภาพเฉลย (Answer Image URL)</label>
+                  <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <input
+                      v-model="questionForm.answer_image_url"
+                      type="text"
+                      class="form-input"
+                      style="flex: 1;"
+                      placeholder="เช่น /questions/q1_answer.png (หรือปล่อยว่าง)"
+                    />
+                    <label class="btn btn-secondary" style="margin: 0; padding: 0 1rem; height: 42px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.85rem; font-weight: 600; white-space: nowrap; flex-shrink: 0; border-radius: var(--radius-sm);">
+                      อัพโหลด
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        style="display: none;" 
+                        @change="(e) => handleImageUpload(e, 'answer_image_url')"
+                      />
+                    </label>
+                  </div>
+                  <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.25rem;">
+                    * สำหรับเฉลยด้วยสไลด์คำเฉลยเต็มจอ
+                  </span>
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div style="display: flex; justify-content: flex-end; border-top: 1px solid var(--glass-border); padding-top: 1.5rem;">
+                <button
+                  @click="handleSaveQuestion"
+                  :disabled="isSavingQuestion"
+                  class="btn btn-primary"
+                  style="min-width: 160px; font-weight: 600; height: 42px;"
+                >
+                  {{ isSavingQuestion ? 'กำลังบันทึก...' : 'บันทึกข้อมูลข้อที่ ' + selectedQuestionNumber }}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+
 
     </div>
 
