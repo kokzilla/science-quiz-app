@@ -538,8 +538,7 @@ const handleRoundChange = () => {
               :key="team.id"
               class="correct-team-badge"
             >
-              <CheckCircle :size="40" class="icon-success" />
-              <span>TEAM {{ String(team.team_number).padStart(2, '0') }}</span>
+              {{ String(team.team_number).padStart(2, '0') }}
             </div>
           </div>
         </div>
@@ -755,26 +754,26 @@ const handleRoundChange = () => {
 
 .correct-teams-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 1.5rem;
   width: 100%;
   max-width: 100%; /* Spans full widescreen container width */
+  justify-content: center;
 }
 
 .correct-team-badge {
   background: rgba(0, 230, 118, 0.05);
   border: 2px solid rgba(0, 230, 118, 0.35);
   box-shadow: 0 0 15px rgba(0, 230, 118, 0.05);
-  padding: 1.5rem 2rem;
-  border-radius: var(--radius-md);
+  aspect-ratio: 1;
+  border-radius: 50%;
   font-family: var(--font-title);
-  font-size: 2.6rem; /* Increased size */
-  font-weight: 800;
+  font-size: 3.2rem; /* Big legible numbers */
+  font-weight: 900;
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1.2rem;
   animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -1022,8 +1021,11 @@ const handleRoundChange = () => {
     gap: 2rem;
   }
   .correct-teams-grid {
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
     gap: 1.2rem;
+  }
+  .correct-team-badge {
+    font-size: 2.8rem;
   }
   .text-question-layout {
     min-height: 60vh;
@@ -1079,8 +1081,11 @@ const handleRoundChange = () => {
     gap: 1.5rem;
   }
   .correct-teams-grid {
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
     gap: 1rem;
+  }
+  .correct-team-badge {
+    font-size: 2.2rem;
   }
   .question-header {
     margin-bottom: 0.25rem;
