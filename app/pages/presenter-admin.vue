@@ -352,7 +352,7 @@ const handleExit = () => {
                 :class="currentRound.presenter_show_state === 'answer_revealed' ? 'btn-primary active-btn' : 'btn-secondary'"
               >
                 <Eye :size="20" />
-                <span>3. แสดงคำตอบที่ถูกต้อง (เฉลยตัวละคร)</span>
+                <span>3. แสดงคำตอบที่ถูกต้อง</span>
               </button>
 
               <!-- Action 4: Reveal Correct Teams -->
