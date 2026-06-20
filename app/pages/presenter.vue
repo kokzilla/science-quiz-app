@@ -44,6 +44,10 @@ let timerInterval: any = null
 let roundChannel: any = null
 let answersChannel: any = null
 
+// Question Intro state
+const showQuestionIntro = ref(false)
+let introTimeout: any = null
+
 onMounted(async () => {
   selectedRoundId.value = route.query.round as string || ''
   
@@ -257,6 +261,17 @@ const speakQuestionStart = (qNum: number) => {
   }, 100)
 }
 
+const triggerQuestionStart = (qNum: number) => {
+  if (introTimeout) clearTimeout(introTimeout)
+  showQuestionIntro.value = true
+  
+  speakQuestionStart(qNum)
+  
+  introTimeout = setTimeout(() => {
+    showQuestionIntro.value = false
+  }, 2500)
+}
+
 // Setup real-time listener for Stage Admin updates
 const setupRealtimeSubscription = () => {
   if (!supabase.value || !selectedRoundId.value) return
@@ -280,13 +295,13 @@ const setupRealtimeSubscription = () => {
       if (payload.new.presenter_active_question !== prevActiveQ) {
         await fetchActiveQuestion(payload.new.presenter_active_question)
         if (payload.new.presenter_show_state === 'question') {
-          speakQuestionStart(payload.new.presenter_active_question)
+          triggerQuestionStart(payload.new.presenter_active_question)
         }
       } else {
         if (payload.new.presenter_show_state === 'correct_teams') {
           await fetchCorrectTeams()
         } else if (payload.new.presenter_show_state === 'question' && prevShowState !== 'question') {
-          speakQuestionStart(payload.new.presenter_active_question)
+          triggerQuestionStart(payload.new.presenter_active_question)
         }
       }
 
@@ -491,6 +506,14 @@ const handleRoundChange = () => {
       <!-- MAIN PRESENTATION BODY -->
       <div class="presentation-container">
         
+        <!-- Large Question Intro Popup Overlay -->
+        <Transition name="intro-fade">
+          <div v-if="showQuestionIntro" class="question-intro-overlay">
+            <div class="intro-badge-cosmic">ข้อที่ {{ currentRound.presenter_active_question }}</div>
+            <div class="intro-subtext">เตรียมตัวอ่านคำถาม...</div>
+          </div>
+        </Transition>
+
         <!-- Timer countdown overlay widget -->
         <div v-if="currentRound.presenter_show_state === 'timer_start'" class="timer-overlay">
           <div class="timer-circle" :class="{ 'timer-warning': timerRemaining <= 5 }">
@@ -1120,5 +1143,57 @@ const handleRoundChange = () => {
   padding-top: 1px;
   width: 100%;
   text-align: center;
+}
+
+/* Question Intro Overlay Styles */
+.question-intro-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #020306;
+  background-image: 
+    radial-gradient(circle at 50% 50%, rgba(213, 0, 249, 0.18) 0%, transparent 70%),
+    radial-gradient(circle at 50% 50%, rgba(0, 229, 255, 0.12) 0%, transparent 60%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+}
+
+.intro-badge-cosmic {
+  font-family: var(--font-title);
+  font-size: 8rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 30px rgba(0, 229, 255, 0.3));
+  margin-bottom: 1.5rem;
+  animation: zoomPulse 2.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite alternate;
+}
+
+.intro-subtext {
+  font-size: 2.2rem;
+  color: var(--text-secondary);
+  letter-spacing: 2px;
+  opacity: 0.8;
+}
+
+@keyframes zoomPulse {
+  0% { transform: scale(0.95); filter: drop-shadow(0 0 20px rgba(0, 229, 255, 0.2)); }
+  100% { transform: scale(1.05); filter: drop-shadow(0 0 40px rgba(213, 0, 249, 0.4)); }
+}
+
+/* intro-fade transition */
+.intro-fade-enter-active, .intro-fade-leave-active {
+  transition: opacity 0.4s ease;
+}
+.intro-fade-enter-from, .intro-fade-leave-to {
+  opacity: 0;
 }
 </style>
