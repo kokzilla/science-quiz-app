@@ -38,6 +38,8 @@ const errorMsg = ref('')
 // Realtime subscriptions
 let answersChannel: any = null
 let roundChannel: any = null
+let autoTimerTimeout: any = null
+const isLoaded = ref(false)
 
 const cleanupSubscriptions = () => {
   if (answersChannel && supabase.value) {
@@ -52,6 +54,7 @@ const cleanupSubscriptions = () => {
 
 onUnmounted(() => {
   cleanupSubscriptions()
+  if (autoTimerTimeout) clearTimeout(autoTimerTimeout)
 })
 
 onMounted(async () => {
@@ -95,6 +98,29 @@ watch(roundsList, () => {
   }
 })
 
+watch(
+  [
+    () => currentRound.value?.presenter_show_state,
+    () => currentRound.value?.presenter_active_question
+  ],
+  ([newState, newQNum], [oldState, oldQNum]) => {
+    if (autoTimerTimeout) {
+      clearTimeout(autoTimerTimeout)
+      autoTimerTimeout = null
+    }
+
+    if (!isLoaded.value) return
+
+    if (newState === 'question') {
+      autoTimerTimeout = setTimeout(() => {
+        if (currentRound.value?.presenter_show_state === 'question' && currentRound.value?.presenter_active_question === newQNum) {
+          updatePresenterState(newQNum, 'timer_start', true)
+        }
+      }, 2500)
+    }
+  }
+)
+
 const fetchRounds = async () => {
   if (!supabase.value) return
   const { data } = await supabase.value
@@ -109,6 +135,7 @@ const fetchRounds = async () => {
 const handleRoundChange = async () => {
   if (!supabase.value || !selectedRoundId.value) return
   loading.value = true
+  isLoaded.value = false
   
   try {
     // 1. Fetch round
@@ -161,6 +188,9 @@ const handleRoundChange = async () => {
     errorMsg.value = `โหลดข้อมูลควบคุมล้มเหลว: ${err.message}`
   } finally {
     loading.value = false
+    setTimeout(() => {
+      isLoaded.value = true
+    }, 500)
   }
 }
 
@@ -312,7 +342,7 @@ const handleExit = () => {
                 :class="currentRound.presenter_show_state === 'timer_start' ? 'btn-primary active-btn-timer' : 'btn-secondary'"
               >
                 <Clock :size="20" />
-                <span>2. เริ่มจับเวลา 30 วินาที (รันนาฬิกาและเสียง)</span>
+                <span>2. เริ่มจับเวลา 30 วินาที (เริ่มอัตโนมัติหลังเปิดโจทย์ 2.5 วิ)</span>
               </button>
 
               <!-- Action 3: Reveal Answer -->
