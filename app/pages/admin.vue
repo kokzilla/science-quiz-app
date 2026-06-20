@@ -915,7 +915,7 @@ const handleCSVImport = async (event: Event) => {
     <div v-if="currentRound" class="glass-card" style="margin-bottom: 2rem; border-color: var(--glass-border-glow);">
       <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 1.5rem; margin-bottom: 1.5rem;">
         <div>
-          <h1 style="font-size: 2rem; margin-bottom: 0.25rem; color: #fff; display: inline-flex; align-items: center; gap: 0.75rem;">
+          <h1 style="font-size: 2rem; margin-bottom: 0.25rem; color: var(--text-primary); display: inline-flex; align-items: center; gap: 0.75rem;">
             <span>{{ currentRound.name }}</span>
             <button 
               @click="handleEditRoundName" 
@@ -1060,7 +1060,7 @@ const handleCSVImport = async (event: Event) => {
 
           <!-- Teams List & Tie Breaker Ajustment -->
           <div style="flex: 1.5;">
-            <h3 style="margin-bottom: 1rem; font-size: 1.2rem; color: #fff;">รายชื่อทีมเข้าแข่งทั้งหมด ({{ teams.length }} ทีม)</h3>
+            <h3 style="margin-bottom: 1rem; font-size: 1.2rem; color: var(--text-primary);">รายชื่อทีมเข้าแข่งทั้งหมด ({{ teams.length }} ทีม)</h3>
             
             <div v-if="teams.length === 0" style="color: var(--text-secondary); text-align: center; padding: 3rem;">
               ไม่พบทีมเข้าแข่งในระบบ
@@ -1113,7 +1113,7 @@ const handleCSVImport = async (event: Event) => {
 
       <!-- Tab Content: Questions & Correct Answers Setup -->
       <div v-if="activeTab === 'questions'">
-        <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem; color: #fff;">ตั้งค่ากุญแจเฉลยคำตอบ (Answer Key)</h3>
+        <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem; color: var(--text-primary);">ตั้งค่ากุญแจเฉลยคำตอบ (Answer Key)</h3>
         <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.5rem;">
           กรุณากำหนดคำเฉลยข้อที่ถูกต้อง (ก, ข, ค, ง) สำหรับคำถามทั้ง 20 ข้อ ระบบจะนำไปคำนวณคะแนนให้อัตโนมัติ
         </p>
@@ -1147,7 +1147,7 @@ const handleCSVImport = async (event: Event) => {
 
       <!-- Tab Content: Reveal Score Control -->
       <div v-if="activeTab === 'reveal'">
-        <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem; color: #fff;">ควบคุมการเปิดเผยคะแนนบนหน้าจอ TV</h3>
+        <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem; color: var(--text-primary);">ควบคุมการเปิดเผยคะแนนบนหน้าจอ TV</h3>
         <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.5rem;">
           ผู้ควบคุมสามารถเลื่อนสไลด์ด้านล่างเพื่อควบคุมว่า หน้าจอ TV Scoreboard จะคำนวณคะแนนแสดงผลถึงข้อที่เท่าใด (สร้างความลุ้นระทึกให้ผู้แข่ง!)
         </p>
@@ -1208,7 +1208,7 @@ const handleCSVImport = async (event: Event) => {
       <div v-if="activeTab === 'progress'">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
           <div>
-            <h3 style="font-size: 1.25rem; color: #fff;">ตรวจสอบความคืบหน้าการบันทึกข้อมูล</h3>
+            <h3 style="font-size: 1.25rem; color: var(--text-primary);">ตรวจสอบความคืบหน้าการบันทึกข้อมูล</h3>
             <p style="color: var(--text-secondary); font-size: 0.85rem;">
               ตรวจสอบว่าเจ้าหน้าที่บันทึกคะแนนกรอกคำตอบครบถ้วนของแต่ละข้อหรือยัง (มีทีมทั้งหมด {{ teams.length }} ทีม)
             </p>
@@ -1331,7 +1331,7 @@ const handleCSVImport = async (event: Event) => {
 
         <!-- Manual Editor Section -->
         <div class="glass-card" style="background: rgba(255,255,255,0.01); border-color: rgba(255,255,255,0.05); padding: 2rem;">
-          <h3 style="margin-bottom: 1.5rem; font-size: 1.25rem; color: #fff; display: flex; align-items: center; gap: 0.5rem;">
+          <h3 style="margin-bottom: 1.5rem; font-size: 1.25rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
             <span>แก้ไขข้อมูลคำถามรายข้อ (Manual Question Editor)</span>
           </h3>
 
@@ -1381,7 +1381,7 @@ const handleCSVImport = async (event: Event) => {
                     v-model="questionForm.is_image_only"
                     style="width: 18px; height: 18px; accent-color: var(--color-cyan); cursor: pointer;"
                   />
-                  <label for="is-image-only-checkbox" style="color: #fff; font-weight: 600; cursor: pointer; user-select: none;">
+                  <label for="is-image-only-checkbox" style="color: var(--text-primary); font-weight: 600; cursor: pointer; user-select: none;">
                     ใช้โหมดสไลด์รูปภาพเต็มจอ
                   </label>
                 </div>
@@ -1530,7 +1530,7 @@ const handleCSVImport = async (event: Event) => {
                 <span style="font-family: var(--font-title); font-weight: 800; color: var(--color-gold);">
                   TEAM {{ String(team.team_number).padStart(2, '0') }}
                 </span>
-                <span style="font-weight: 600; color: #fff;">
+                <span style="font-weight: 600; color: var(--text-primary);">
                   {{ team.name }}
                 </span>
               </div>
