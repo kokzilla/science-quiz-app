@@ -58,6 +58,13 @@ onMounted(async () => {
     tickAudio = new Audio('/sounds/countdown.mp3')
     tickAudio.loop = true
     alarmAudio = new Audio('/sounds/alarm.mp3')
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.getVoices()
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices()
+      }
+    }
   }
 })
 
@@ -168,6 +175,21 @@ const fetchCorrectTeams = async () => {
   }
 }
 
+const getThaiFemaleVoice = () => {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null
+  const voices = window.speechSynthesis.getVoices()
+  const thaiVoices = voices.filter(v => v.lang.startsWith('th'))
+  if (thaiVoices.length === 0) return null
+
+  // Prefer Premwadee, Kanya, Narisa, female, or google voices
+  const femaleKeywords = ['premwadee', 'kanya', 'narisa', 'female', 'google']
+  for (const keyword of femaleKeywords) {
+    const found = thaiVoices.find(v => v.name.toLowerCase().includes(keyword))
+    if (found) return found
+  }
+  return thaiVoices[0]
+}
+
 const speakCorrectTeams = () => {
   if (!ttsEnabled.value || typeof window === 'undefined' || !('speechSynthesis' in window)) return
 
@@ -178,7 +200,7 @@ const speakCorrectTeams = () => {
   let text = `รายชื่อทีมที่ตอบถูกต้องในข้อที่ ${qNum} `
 
   if (correctTeams.value.length === 0) {
-    text += 'ไม่มีทีมใดตอบถูกในข้อนี้ครับ'
+    text += 'ไม่มีทีมใดตอบถูกในข้อนี้ค่ะ'
   } else {
     const teamPhrases = correctTeams.value.map(t => `ทีมที่ ${t.team_number}`)
     text += `มีทั้งหมด ${correctTeams.value.length} ทีม ได้แก่ `
@@ -191,6 +213,13 @@ const speakCorrectTeams = () => {
 
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = 'th-TH'
+  
+  // Set voice to Thai female voice if available
+  const femaleVoice = getThaiFemaleVoice()
+  if (femaleVoice) {
+    utterance.voice = femaleVoice
+  }
+
   utterance.volume = soundEnabled.value ? 1.0 : 0.0
   utterance.rate = 0.95 // Slightly slower for clear Thai pronunciation
 
@@ -225,6 +254,11 @@ const setupRealtimeSubscription = () => {
 
       // Sync timer and sounds
       syncTimerState()
+
+      // Cancel TTS speech if we moved away from correct_teams
+      if (payload.new.presenter_show_state !== 'correct_teams' && typeof window !== 'undefined' && ('speechSynthesis' in window)) {
+        window.speechSynthesis.cancel()
+      }
     })
     .subscribe()
 }
@@ -281,6 +315,19 @@ const stopLocalTimer = () => {
   timerActive.value = false
 }
 
+// Watchers to immediately stop speech when audio/TTS is muted
+watch(ttsEnabled, (newVal) => {
+  if (!newVal && typeof window !== 'undefined' && ('speechSynthesis' in window)) {
+    window.speechSynthesis.cancel()
+  }
+})
+
+watch(soundEnabled, (newVal) => {
+  if (!newVal && typeof window !== 'undefined' && ('speechSynthesis' in window)) {
+    window.speechSynthesis.cancel()
+  }
+})
+
 const playTick = () => {
   if (soundEnabled.value && audioReady.value && tickAudio) {
     tickAudio.play().catch(e => console.log('Audio error:', e))
@@ -298,6 +345,9 @@ const stopSounds = () => {
   if (tickAudio) {
     tickAudio.pause()
     tickAudio.currentTime = 0;
+  }
+  if (typeof window !== 'undefined' && ('speechSynthesis' in window)) {
+    window.speechSynthesis.cancel()
   }
 }
 
