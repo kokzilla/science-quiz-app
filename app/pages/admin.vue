@@ -525,6 +525,37 @@ const handleDeleteRound = async () => {
   }
 }
 
+const handleEditRoundName = async () => {
+  if (!supabase.value || !selectedRoundId.value || !currentRound.value) return
+  if (!adminPasskey.value) {
+    alert('กรุณากรอกรหัสผ่านแอดมินก่อนดำเนินการ')
+    return
+  }
+  const newName = prompt('แก้ไขชื่อรอบการแข่งขัน:', currentRound.value.name)
+  if (newName === null) return
+  const trimmed = newName.trim()
+  if (!trimmed) {
+    alert('ชื่อรอบการแข่งขันต้องไม่เป็นค่าว่าง')
+    return
+  }
+
+  const { error } = await supabase.value.rpc('manage_round_secure', {
+    p_action: 'update_name',
+    p_round_name: trimmed,
+    p_status: '',
+    p_reveal_q: 0,
+    p_round_id: selectedRoundId.value,
+    p_admin_passkey: adminPasskey.value
+  })
+
+  if (!error) {
+    currentRound.value.name = trimmed
+    await fetchRounds()
+  } else {
+    alert(`เกิดข้อผิดพลาดในการแก้ไขชื่อรอบ: ${error.message}`)
+  }
+}
+
 const handleLogout = () => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('admin_passkey')
@@ -884,7 +915,16 @@ const handleCSVImport = async (event: Event) => {
     <div v-if="currentRound" class="glass-card" style="margin-bottom: 2rem; border-color: var(--glass-border-glow);">
       <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 1.5rem; margin-bottom: 1.5rem;">
         <div>
-          <h1 style="font-size: 2rem; margin-bottom: 0.25rem; color: #fff;">{{ currentRound.name }}</h1>
+          <h1 style="font-size: 2rem; margin-bottom: 0.25rem; color: #fff; display: inline-flex; align-items: center; gap: 0.75rem;">
+            <span>{{ currentRound.name }}</span>
+            <button 
+              @click="handleEditRoundName" 
+              class="btn btn-secondary" 
+              style="padding: 0.25rem 0.6rem; font-size: 0.75rem; height: 28px; display: inline-flex; align-items: center; justify-content: center; font-weight: normal;"
+            >
+              แก้ไขชื่อรอบ
+            </button>
+          </h1>
           <p style="color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem;">
             <span>สถานะ: </span>
             <span class="status-pill" :class="currentRound.status">{{ currentRound.status }}</span>

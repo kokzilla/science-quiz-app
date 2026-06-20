@@ -220,7 +220,7 @@ $$;
 
 -- D. Admin Manage Rounds
 create or replace function manage_round_secure(
-    p_action text, -- 'create', 'update_reveal', 'update_status', 'delete'
+    p_action text, -- 'create', 'update_reveal', 'update_status', 'update_name', 'delete'
     p_round_name text,
     p_status text,
     p_reveal_q integer,
@@ -256,6 +256,9 @@ begin
         return query select p_round_id;
     elsif p_action = 'update_status' then
         update rounds set status = p_status where id = p_round_id;
+        return query select p_round_id;
+    elsif p_action = 'update_name' then
+        update rounds set name = p_round_name where id = p_round_id;
         return query select p_round_id;
     elsif p_action = 'delete' then
         delete from rounds where id = p_round_id;
