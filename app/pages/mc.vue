@@ -350,7 +350,7 @@ const handleExit = () => {
                 <span style="font-family: var(--font-title); font-weight: 800; font-size: 2.6rem; color: var(--color-gold); text-shadow: var(--shadow-neon-cyan); flex-shrink: 0;">
                   TEAM {{ String(team.team_number).padStart(2, '0') }}
                 </span>
-                <span style="font-size: 2.4rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">{{ team.name }}</span>
+                <span style="font-size: 2.4rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;" :title="team.name">{{ team.name }}</span>
               </div>
               <CheckCircle :size="48" style="color: var(--color-success);" />
             </div>

@@ -415,7 +415,7 @@ const paginatedLeaderboard = computed(() => {
 
                 <!-- Team Name -->
                 <div class="team-name">
-                  <span class="team-name-text">{{ item.name }}</span>
+                  <span class="team-name-text" :title="item.name">{{ item.name }}</span>
                   <span v-if="item.tie_breaker_score > 0" class="status-pill-tiebreak">
                     ไทเบรก +{{ item.tie_breaker_score }}
                   </span>
