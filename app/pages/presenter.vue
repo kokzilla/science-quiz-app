@@ -178,16 +178,28 @@ const fetchCorrectTeams = async () => {
 const getThaiFemaleVoice = () => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null
   const voices = window.speechSynthesis.getVoices()
-  const thaiVoices = voices.filter(v => v.lang.startsWith('th'))
+  
+  // Filter for Thai voices
+  const thaiVoices = voices.filter(v => v.lang.toLowerCase().startsWith('th'))
   if (thaiVoices.length === 0) return null
 
-  // Prefer Premwadee, Kanya, Narisa, female, or google voices
-  const femaleKeywords = ['premwadee', 'kanya', 'narisa', 'female', 'google']
-  for (const keyword of femaleKeywords) {
-    const found = thaiVoices.find(v => v.name.toLowerCase().includes(keyword))
-    if (found) return found
+  // Exclude known Thai male voices (Pattara on Windows, Niwat on macOS/iOS) and generic male voices
+  const femaleVoices = thaiVoices.filter(v => {
+    const nameLower = v.name.toLowerCase()
+    return !nameLower.includes('pattara') && !nameLower.includes('niwat') && !nameLower.includes('male')
+  })
+
+  if (femaleVoices.length > 0) {
+    // Prefer Premwadee, Kanya, Narisa, google, or female labeled voices if specifically present
+    const preferredKeywords = ['premwadee', 'kanya', 'narisa', 'google', 'female']
+    for (const keyword of preferredKeywords) {
+      const found = femaleVoices.find(v => v.name.toLowerCase().includes(keyword))
+      if (found) return found
+    }
+    return femaleVoices[0] // Fallback to first non-male Thai voice
   }
-  return thaiVoices[0]
+
+  return thaiVoices[0] // absolute fallback
 }
 
 const speakCorrectTeams = () => {
