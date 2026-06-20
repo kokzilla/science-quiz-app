@@ -346,11 +346,11 @@ const handleExit = () => {
               class="glass-card"
               style="background: rgba(0, 230, 118, 0.05); border-color: rgba(0, 230, 118, 0.2); padding: 1.5rem 2.5rem; display: flex; align-items: center; justify-content: space-between;"
             >
-              <div style="display: flex; align-items: center; gap: 2rem;">
-                <span style="font-family: var(--font-title); font-weight: 800; font-size: 2.6rem; color: var(--color-gold); text-shadow: var(--shadow-neon-cyan);">
+              <div style="display: flex; align-items: center; gap: 2rem; min-width: 0; flex: 1; overflow: hidden;">
+                <span style="font-family: var(--font-title); font-weight: 800; font-size: 2.6rem; color: var(--color-gold); text-shadow: var(--shadow-neon-cyan); flex-shrink: 0;">
                   TEAM {{ String(team.team_number).padStart(2, '0') }}
                 </span>
-                <span style="font-size: 2.4rem; font-weight: 700; color: var(--text-primary);">{{ team.name }}</span>
+                <span style="font-size: 2.4rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1;">{{ team.name }}</span>
               </div>
               <CheckCircle :size="48" style="color: var(--color-success);" />
             </div>

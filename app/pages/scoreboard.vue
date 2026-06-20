@@ -399,39 +399,41 @@ const paginatedLeaderboard = computed(() => {
           ไม่มีทีมเข้าแข่งในระบบ
         </div>
 
-        <div v-else class="scoreboard-grid-container">
-          <TransitionGroup name="flip-list">
-            <div 
-              v-for="item in paginatedLeaderboard" 
-              :key="item.id"
-              class="scoreboard-row"
-              :class="`rank-${item.rank}`"
-            >
-              <!-- Team number (Outstanding) -->
-              <div class="team-no">
-                TEAM {{ String(item.team_number).padStart(2, '0') }}
-              </div>
+        <Transition v-else name="fade" mode="out-in">
+          <div :key="currentPage" class="scoreboard-grid-container">
+            <TransitionGroup name="flip-list">
+              <div 
+                v-for="item in paginatedLeaderboard" 
+                :key="item.id"
+                class="scoreboard-row"
+                :class="`rank-${item.rank}`"
+              >
+                <!-- Team number (Outstanding) -->
+                <div class="team-no">
+                  TEAM {{ String(item.team_number).padStart(2, '0') }}
+                </div>
 
-              <!-- Team Name -->
-              <div class="team-name">
-                <span>{{ item.name }}</span>
-                <span v-if="item.tie_breaker_score > 0" class="status-pill-tiebreak">
-                  ไทเบรก +{{ item.tie_breaker_score }}
-                </span>
-              </div>
+                <!-- Team Name -->
+                <div class="team-name">
+                  <span class="team-name-text">{{ item.name }}</span>
+                  <span v-if="item.tie_breaker_score > 0" class="status-pill-tiebreak">
+                    ไทเบรก +{{ item.tie_breaker_score }}
+                  </span>
+                </div>
 
-              <!-- Points display -->
-              <div class="team-score">
-                {{ item.finalScore }} <span class="score-label">คะแนน</span>
-              </div>
+                <!-- Points display -->
+                <div class="team-score">
+                  {{ item.finalScore }} <span class="score-label">คะแนน</span>
+                </div>
 
-              <!-- Rank badge (Moved behind score) -->
-              <div class="rank-badge">
-                {{ item.rank }}
+                <!-- Rank badge (Moved behind score) -->
+                <div class="rank-badge">
+                  {{ item.rank }}
+                </div>
               </div>
-            </div>
-          </TransitionGroup>
-        </div>
+            </TransitionGroup>
+          </div>
+        </Transition>
       </div>
 
       <!-- Bottom Pager Indicator (TV view pagination progress) -->
@@ -517,6 +519,8 @@ const paginatedLeaderboard = computed(() => {
   align-items: center !important;
   gap: 1rem !important;
   font-weight: 700 !important;
+  min-width: 0 !important;
+  flex: 1 !important;
 }
 
 .status-pill-tiebreak {
@@ -636,5 +640,24 @@ const paginatedLeaderboard = computed(() => {
     height: 30px !important;
     font-size: 0.9rem !important;
   }
+}
+
+/* Page fade transition */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* Team name text truncation */
+.team-name-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
 }
 </style>
