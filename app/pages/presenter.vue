@@ -231,14 +231,13 @@ const speakCorrectTeams = () => {
   }, 100)
 }
 
-const speakCorrectAnswer = () => {
-  if (!ttsEnabled.value || typeof window === 'undefined' || !('speechSynthesis' in window) || !question.value) return
+const speakQuestionStart = (qNum: number) => {
+  if (!ttsEnabled.value || typeof window === 'undefined' || !('speechSynthesis' in window)) return
 
   // Cancel any ongoing speech
   window.speechSynthesis.cancel()
 
-  const answer = question.value.correct_answer || ''
-  const text = `คำตอบคือ ข้อ ${answer} ครับ`
+  const text = `ข้อที่ ${qNum} เริ่มครับ`
 
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = 'th-TH'
@@ -280,11 +279,14 @@ const setupRealtimeSubscription = () => {
       // If active question changed, fetch new question details
       if (payload.new.presenter_active_question !== prevActiveQ) {
         await fetchActiveQuestion(payload.new.presenter_active_question)
+        if (payload.new.presenter_show_state === 'question') {
+          speakQuestionStart(payload.new.presenter_active_question)
+        }
       } else {
         if (payload.new.presenter_show_state === 'correct_teams') {
           await fetchCorrectTeams()
-        } else if (payload.new.presenter_show_state === 'answer_revealed' && prevShowState !== 'answer_revealed') {
-          speakCorrectAnswer()
+        } else if (payload.new.presenter_show_state === 'question' && prevShowState !== 'question') {
+          speakQuestionStart(payload.new.presenter_active_question)
         }
       }
 
@@ -292,7 +294,7 @@ const setupRealtimeSubscription = () => {
       syncTimerState()
 
       // Cancel TTS speech if we moved away from speaking states
-      if (payload.new.presenter_show_state !== 'correct_teams' && payload.new.presenter_show_state !== 'answer_revealed' && typeof window !== 'undefined' && ('speechSynthesis' in window)) {
+      if (payload.new.presenter_show_state !== 'correct_teams' && payload.new.presenter_show_state !== 'question' && typeof window !== 'undefined' && ('speechSynthesis' in window)) {
         window.speechSynthesis.cancel()
       }
     })
