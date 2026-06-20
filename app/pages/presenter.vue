@@ -231,6 +231,33 @@ const speakCorrectTeams = () => {
   }, 100)
 }
 
+const speakCorrectAnswer = () => {
+  if (!ttsEnabled.value || typeof window === 'undefined' || !('speechSynthesis' in window) || !question.value) return
+
+  // Cancel any ongoing speech
+  window.speechSynthesis.cancel()
+
+  const answer = question.value.correct_answer || ''
+  const text = `คำตอบคือ ข้อ ${answer} ครับ`
+
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = 'th-TH'
+  
+  // Set voice to Thai male voice if available
+  const maleVoice = getThaiMaleVoice()
+  if (maleVoice) {
+    utterance.voice = maleVoice
+  }
+
+  utterance.volume = soundEnabled.value ? 1.0 : 0.0
+  utterance.rate = 0.95 // Slightly slower for clear Thai pronunciation
+
+  // Chrome Bug Workaround: Delay speaking slightly after cancel() to avoid thread hang
+  setTimeout(() => {
+    window.speechSynthesis.speak(utterance)
+  }, 100)
+}
+
 // Setup real-time listener for Stage Admin updates
 const setupRealtimeSubscription = () => {
   if (!supabase.value || !selectedRoundId.value) return
@@ -253,15 +280,19 @@ const setupRealtimeSubscription = () => {
       // If active question changed, fetch new question details
       if (payload.new.presenter_active_question !== prevActiveQ) {
         await fetchActiveQuestion(payload.new.presenter_active_question)
-      } else if (payload.new.presenter_show_state === 'correct_teams') {
-        await fetchCorrectTeams()
+      } else {
+        if (payload.new.presenter_show_state === 'correct_teams') {
+          await fetchCorrectTeams()
+        } else if (payload.new.presenter_show_state === 'answer_revealed' && prevShowState !== 'answer_revealed') {
+          speakCorrectAnswer()
+        }
       }
 
       // Sync timer and sounds
       syncTimerState()
 
-      // Cancel TTS speech if we moved away from correct_teams
-      if (payload.new.presenter_show_state !== 'correct_teams' && typeof window !== 'undefined' && ('speechSynthesis' in window)) {
+      // Cancel TTS speech if we moved away from speaking states
+      if (payload.new.presenter_show_state !== 'correct_teams' && payload.new.presenter_show_state !== 'answer_revealed' && typeof window !== 'undefined' && ('speechSynthesis' in window)) {
         window.speechSynthesis.cancel()
       }
     })
