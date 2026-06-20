@@ -223,7 +223,10 @@ const speakCorrectTeams = () => {
   utterance.volume = soundEnabled.value ? 1.0 : 0.0
   utterance.rate = 0.95 // Slightly slower for clear Thai pronunciation
 
-  window.speechSynthesis.speak(utterance)
+  // Chrome Bug Workaround: Delay speaking slightly after cancel() to avoid thread hang
+  setTimeout(() => {
+    window.speechSynthesis.speak(utterance)
+  }, 100)
 }
 
 // Setup real-time listener for Stage Admin updates
@@ -354,7 +357,8 @@ const stopSounds = () => {
 // Unlock audio autoplay
 const enableAudio = () => {
   audioReady.value = true
-  // Play silent clips to unlock
+  
+  // Play silent clips to unlock HTMLAudioElement
   if (tickAudio && alarmAudio) {
     tickAudio.play().then(() => {
       tickAudio?.pause()
@@ -365,6 +369,12 @@ const enableAudio = () => {
       alarmAudio?.pause()
       alarmAudio!.currentTime = 0
     }).catch(e => console.log(e))
+  }
+
+  // Speak empty utterance to unlock SpeechSynthesis in Chrome/Edge autoplay policy
+  if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    const unlockUtterance = new SpeechSynthesisUtterance('')
+    window.speechSynthesis.speak(unlockUtterance)
   }
 }
 
