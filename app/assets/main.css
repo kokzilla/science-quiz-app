@@ -107,6 +107,46 @@ body, .glass-card, .scoreboard-row, .btn, .form-input, .navbar {
   background: linear-gradient(90deg, rgba(205, 127, 50, 0.1), rgba(255, 255, 255, 0.8)) !important;
 }
 
+/* Light Theme Input / Textbox overrides */
+.light-theme .form-input,
+.light-theme select,
+.light-theme textarea,
+.light-theme input[type="text"],
+.light-theme input[type="password"],
+.light-theme input[type="number"] {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+}
+
+.light-theme .form-input:focus,
+.light-theme select:focus,
+.light-theme textarea:focus,
+.light-theme input:focus {
+  border-color: var(--color-cyan) !important;
+  box-shadow: 0 0 0 3px rgba(0, 172, 193, 0.15) !important;
+}
+
+/* Light theme navbar overrides to preserve dark header style */
+.light-theme .navbar .nav-link {
+  color: #94a3b8 !important;
+}
+.light-theme .navbar .nav-link:hover,
+.light-theme .navbar .nav-link.router-link-active {
+  color: #00e5ff !important;
+  background: rgba(0, 229, 255, 0.08) !important;
+}
+.light-theme .navbar .btn-theme-toggle {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #94a3b8 !important;
+}
+.light-theme .navbar .btn-theme-toggle:hover {
+  border-color: #00e5ff !important;
+  color: #00e5ff !important;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.3) !important;
+}
+
 /* ==========================================================================
    BASE STYLES & SCROLLBAR
    ========================================================================== */
