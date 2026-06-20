@@ -310,7 +310,7 @@ const handleExit = () => {
 
           <!-- Q1-Q20 Grid Selector -->
           <div class="glass-card">
-            <h3 style="margin-bottom: 1rem; font-size: 1.1rem; color: #fff;">รายการคำถามทั้งหมด</h3>
+            <h3 style="margin-bottom: 1rem; font-size: 1.1rem; color: var(--text-primary);">รายการคำถามทั้งหมด</h3>
             <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem;">
               <button 
                 v-for="i in 20" 
@@ -350,7 +350,7 @@ const handleExit = () => {
                 <span style="font-family: var(--font-title); font-weight: 800; font-size: 2.6rem; color: var(--color-gold); text-shadow: var(--shadow-neon-cyan);">
                   TEAM {{ String(team.team_number).padStart(2, '0') }}
                 </span>
-                <span style="font-size: 2.4rem; font-weight: 700; color: #fff;">{{ team.name }}</span>
+                <span style="font-size: 2.4rem; font-weight: 700; color: var(--text-primary);">{{ team.name }}</span>
               </div>
               <CheckCircle :size="48" style="color: var(--color-success);" />
             </div>
@@ -363,7 +363,7 @@ const handleExit = () => {
       <div class="glass-card" style="margin-top: 2rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
           <div>
-            <h3 style="font-size: 1.25rem; color: #fff;">ความคืบหน้าการบันทึกข้อมูลคำตอบ (คีย์ครบถ้วนแสดงเป็นสีเขียว)</h3>
+            <h3 style="font-size: 1.25rem; color: var(--text-primary);">ความคืบหน้าการบันทึกข้อมูลคำตอบ (คีย์ครบถ้วนแสดงเป็นสีเขียว)</h3>
             <p style="color: var(--text-secondary); font-size: 0.85rem;">
               ตรวจสอบว่าคำตอบถูกบันทึกเข้าระบบครบทุกทีมแล้วหรือไม่ (มีทีมทั้งหมด {{ teams.length }} ทีม)
             </p>

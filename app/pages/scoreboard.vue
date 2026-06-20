@@ -10,8 +10,13 @@ import {
   ChevronLeft, 
   ChevronRight,
   Pause,
-  Play
+  Play,
+  Sun,
+  Moon
 } from 'lucide-vue-next'
+import { useTheme } from '~/composables/useTheme'
+
+const { theme, toggleTheme } = useTheme()
 
 const route = useRoute()
 const { supabase, isConfigured } = useSupabase()
@@ -317,33 +322,38 @@ const paginatedLeaderboard = computed(() => {
     
     <!-- Audio controls & Setup Info (floating no-print controls) -->
     <div class="no-print" style="position: absolute; top: 1rem; right: 1rem; display: flex; gap: 0.5rem; z-index: 100; flex-wrap: wrap;">
+      <button @click="toggleTheme" class="btn btn-secondary" style="padding: 0.5rem; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center;" :title="theme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'">
+        <Sun v-if="theme === 'light'" :size="18" />
+        <Moon v-else :size="18" />
+      </button>
+
       <button @click="soundEnabled = !soundEnabled" class="btn btn-secondary" style="padding: 0.5rem; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center;">
         <Volume2 v-if="soundEnabled" :size="18" />
         <VolumeX v-else :size="18" style="color: var(--text-muted);" />
       </button>
 
       <div style="background: rgba(0,0,0,0.5); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 0.5rem; border: 1px solid var(--glass-border);">
-        <span>เลือกรอบ:</span>
-        <select v-model="selectedRoundId" @change="handleRoundChange" style="background: var(--bg-tertiary); color: #fff; border: none; font-size: 0.75rem; border-radius: 4px; padding: 0.2rem 0.5rem; outline: none; cursor: pointer; max-width: 140px;">
-          <option v-for="r in roundsList" :key="r.id" :value="r.id">
+        <span style="color: #fff;">เลือกรอบ:</span>
+        <select v-model="selectedRoundId" @change="handleRoundChange" style="background: var(--bg-tertiary); color: var(--text-primary); border: none; font-size: 0.75rem; border-radius: 4px; padding: 0.2rem 0.5rem; outline: none; cursor: pointer; max-width: 140px;">
+          <option v-for="r in roundsList" :key="r.id" :value="r.id" style="color: var(--text-primary); background: var(--bg-secondary);">
             {{ r.name }}
           </option>
         </select>
       </div>
 
       <div style="background: rgba(0,0,0,0.5); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 0.5rem; border: 1px solid var(--glass-border);">
-        <span>เรียงลำดับ:</span>
-        <button @click="sortBy = 'score'" class="btn" :style="sortBy === 'score' ? 'background: var(--color-cyan); color: #000; font-weight: 700;' : 'background: var(--bg-tertiary); color: #fff;'" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border: none; border-radius: 4px; cursor: pointer;">
+        <span style="color: #fff;">เรียงลำดับ:</span>
+        <button @click="sortBy = 'score'" class="btn" :style="sortBy === 'score' ? 'background: var(--color-cyan); color: #000; font-weight: 700;' : 'background: var(--bg-tertiary); color: var(--text-primary);'" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border: none; border-radius: 4px; cursor: pointer;">
           คะแนน
         </button>
-        <button @click="sortBy = 'team'" class="btn" :style="sortBy === 'team' ? 'background: var(--color-cyan); color: #000; font-weight: 700;' : 'background: var(--bg-tertiary); color: #fff;'" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border: none; border-radius: 4px; cursor: pointer;">
+        <button @click="sortBy = 'team'" class="btn" :style="sortBy === 'team' ? 'background: var(--color-cyan); color: #000; font-weight: 700;' : 'background: var(--bg-tertiary); color: var(--text-primary);'" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border: none; border-radius: 4px; cursor: pointer;">
           เลขทีม
         </button>
       </div>
 
       <div style="background: rgba(0,0,0,0.5); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 0.5rem; border: 1px solid var(--glass-border);">
-        <span>เลื่อนหน้าจออัตโนมัติ:</span>
-        <button @click="toggleAutoScroll" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: var(--bg-tertiary);">
+        <span style="color: #fff;">เลื่อนหน้าจออัตโนมัติ:</span>
+        <button @click="toggleAutoScroll" class="btn" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: var(--bg-tertiary); color: var(--text-primary);">
           <Pause v-if="isAutoScrolling" :size="12" />
           <Play v-else :size="12" />
           {{ isAutoScrolling ? 'เปิด' : 'ปิด' }}
@@ -501,7 +511,7 @@ const paginatedLeaderboard = computed(() => {
 }
 
 .team-name {
-  color: #fff !important;
+  color: var(--text-primary) !important;
   font-size: 1.8rem !important;
   display: flex !important;
   align-items: center !important;

@@ -47,6 +47,66 @@
   --transition-normal: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Light Theme Override Variables */
+.light-theme {
+  --bg-primary: #f1f5f9;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e2e8f0;
+  
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(15, 23, 42, 0.08);
+  --glass-border-glow: rgba(0, 172, 193, 0.25);
+  
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  
+  --color-cyan: #00838f;
+  --color-purple: #8e24aa;
+  --color-gold: #f57f17;
+  --color-success: #2e7d32;
+  --color-error: #c62828;
+  --color-warning: #ef6c00;
+
+  --shadow-neon-cyan: 0 0 10px rgba(0, 172, 193, 0.25);
+  --shadow-neon-purple: 0 0 10px rgba(142, 36, 170, 0.25);
+  --shadow-card: 0 10px 30px rgba(15, 23, 42, 0.06);
+}
+
+/* Smooth Theme Transitions */
+body, .glass-card, .scoreboard-row, .btn, .form-input, .navbar {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.light-theme body {
+  background-image: 
+    radial-gradient(at 10% 20%, rgba(142, 36, 170, 0.04) 0px, transparent 50%),
+    radial-gradient(at 90% 80%, rgba(0, 172, 193, 0.04) 0px, transparent 50%);
+}
+
+.light-theme .scoreboard-view {
+  background: #f8fafc;
+  background-image: 
+    radial-gradient(circle at 50% -20%, rgba(142, 36, 170, 0.06) 0%, transparent 70%),
+    radial-gradient(circle at 0% 100%, rgba(0, 172, 193, 0.04) 0%, transparent 60%);
+}
+
+.light-theme .scoreboard-row {
+  background: rgba(255, 255, 255, 0.8) !important;
+  box-shadow: 0 4px 15px rgba(15, 23, 42, 0.04) !important;
+  border: 1px solid rgba(15, 23, 42, 0.06) !important;
+}
+
+.light-theme .rank-1 {
+  background: linear-gradient(90deg, rgba(245, 127, 23, 0.12), rgba(255, 255, 255, 0.8)) !important;
+}
+.light-theme .rank-2 {
+  background: linear-gradient(90deg, rgba(148, 163, 184, 0.1), rgba(255, 255, 255, 0.8)) !important;
+}
+.light-theme .rank-3 {
+  background: linear-gradient(90deg, rgba(205, 127, 50, 0.1), rgba(255, 255, 255, 0.8)) !important;
+}
+
 /* ==========================================================================
    BASE STYLES & SCROLLBAR
    ========================================================================== */
