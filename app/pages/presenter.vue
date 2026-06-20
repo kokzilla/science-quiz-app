@@ -10,7 +10,9 @@ import {
   HelpCircle,
   Award,
   CheckCircle,
-  Play
+  Play,
+  Mic,
+  MicOff
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -29,6 +31,7 @@ const errorMsg = ref('')
 // Sound files
 const audioReady = ref(false)
 const soundEnabled = ref(true)
+const ttsEnabled = ref(true) // TTS voice toggle state
 let tickAudio: HTMLAudioElement | null = null
 let alarmAudio: HTMLAudioElement | null = null
 
@@ -155,6 +158,43 @@ const fetchCorrectTeams = async () => {
   
   const correctIds = answersData?.map(ans => ans.team_id) || []
   correctTeams.value = allTeams.value.filter(t => correctIds.includes(t.id))
+
+  // Sort correct teams by number ascending
+  correctTeams.value.sort((a, b) => a.team_number - b.team_number)
+
+  // Trigger TTS voice announcement
+  if (currentRound.value?.presenter_show_state === 'correct_teams') {
+    speakCorrectTeams()
+  }
+}
+
+const speakCorrectTeams = () => {
+  if (!ttsEnabled.value || typeof window === 'undefined' || !('speechSynthesis' in window)) return
+
+  // Cancel any ongoing speech
+  window.speechSynthesis.cancel()
+
+  const qNum = currentRound.value?.presenter_active_question || 1
+  let text = `รายชื่อทีมที่ตอบถูกต้องในข้อที่ ${qNum} `
+
+  if (correctTeams.value.length === 0) {
+    text += 'ไม่มีทีมใดตอบถูกในข้อนี้ครับ'
+  } else {
+    const teamPhrases = correctTeams.value.map(t => `ทีมที่ ${t.team_number}`)
+    text += `มีทั้งหมด ${correctTeams.value.length} ทีม ได้แก่ `
+    if (teamPhrases.length === 1) {
+      text += teamPhrases[0]
+    } else {
+      text += teamPhrases.slice(0, -1).join(', ') + ' และ ' + teamPhrases[teamPhrases.length - 1]
+    }
+  }
+
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = 'th-TH'
+  utterance.volume = soundEnabled.value ? 1.0 : 0.0
+  utterance.rate = 0.95 // Slightly slower for clear Thai pronunciation
+
+  window.speechSynthesis.speak(utterance)
 }
 
 // Setup real-time listener for Stage Admin updates
@@ -313,6 +353,16 @@ const handleRoundChange = () => {
 
     <!-- Configuration selector (no-print floating top right for testing) -->
     <div class="no-print" style="position: absolute; top: 1rem; right: 1rem; display: flex; gap: 0.5rem; z-index: 99;">
+      <button 
+        @click="ttsEnabled = !ttsEnabled" 
+        class="btn btn-secondary" 
+        style="padding: 0.5rem; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center;"
+        :title="ttsEnabled ? 'ปิดระบบเสียงอ่านเลขทีมตอบถูก' : 'เปิดระบบเสียงอ่านเลขทีมตอบถูก'"
+      >
+        <Mic v-if="ttsEnabled" :size="18" class="text-cyan" />
+        <MicOff v-else :size="18" style="color: var(--text-muted);" />
+      </button>
+
       <button @click="soundEnabled = !soundEnabled" class="btn btn-secondary" style="padding: 0.5rem; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center;">
         <Volume2 v-if="soundEnabled" :size="18" />
         <VolumeX v-else :size="18" style="color: var(--text-muted);" />
