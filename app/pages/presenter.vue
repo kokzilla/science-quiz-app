@@ -175,7 +175,7 @@ const fetchCorrectTeams = async () => {
   }
 }
 
-const getThaiFemaleVoice = () => {
+const getThaiMaleVoice = () => {
   if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null
   const voices = window.speechSynthesis.getVoices()
   
@@ -183,23 +183,13 @@ const getThaiFemaleVoice = () => {
   const thaiVoices = voices.filter(v => v.lang.toLowerCase().startsWith('th'))
   if (thaiVoices.length === 0) return null
 
-  // Exclude known Thai male voices (Pattara on Windows, Niwat on macOS/iOS) and generic male voices
-  const femaleVoices = thaiVoices.filter(v => {
-    const nameLower = v.name.toLowerCase()
-    return !nameLower.includes('pattara') && !nameLower.includes('niwat') && !nameLower.includes('male')
-  })
-
-  if (femaleVoices.length > 0) {
-    // Prefer Premwadee, Kanya, Narisa, google, or female labeled voices if specifically present
-    const preferredKeywords = ['premwadee', 'kanya', 'narisa', 'google', 'female']
-    for (const keyword of preferredKeywords) {
-      const found = femaleVoices.find(v => v.name.toLowerCase().includes(keyword))
-      if (found) return found
-    }
-    return femaleVoices[0] // Fallback to first non-male Thai voice
+  // Prefer Pattara (Windows male), Niwat (macOS male) or any name containing "pattara", "niwat", "male"
+  const maleKeywords = ['pattara', 'niwat', 'male']
+  for (const keyword of maleKeywords) {
+    const found = thaiVoices.find(v => v.name.toLowerCase().includes(keyword))
+    if (found) return found
   }
-
-  return thaiVoices[0] // absolute fallback
+  return thaiVoices[0]
 }
 
 const speakCorrectTeams = () => {
@@ -212,7 +202,7 @@ const speakCorrectTeams = () => {
   let text = `รายชื่อทีมที่ตอบถูกต้องในข้อที่ ${qNum} `
 
   if (correctTeams.value.length === 0) {
-    text += 'ไม่มีทีมใดตอบถูกในข้อนี้ค่ะ'
+    text += 'ไม่มีทีมใดตอบถูกในข้อนี้ครับ'
   } else {
     const teamPhrases = correctTeams.value.map(t => `ทีมที่ ${t.team_number}`)
     text += `มีทั้งหมด ${correctTeams.value.length} ทีม ได้แก่ `
@@ -226,10 +216,10 @@ const speakCorrectTeams = () => {
   const utterance = new SpeechSynthesisUtterance(text)
   utterance.lang = 'th-TH'
   
-  // Set voice to Thai female voice if available
-  const femaleVoice = getThaiFemaleVoice()
-  if (femaleVoice) {
-    utterance.voice = femaleVoice
+  // Set voice to Thai male voice if available
+  const maleVoice = getThaiMaleVoice()
+  if (maleVoice) {
+    utterance.voice = maleVoice
   }
 
   utterance.volume = soundEnabled.value ? 1.0 : 0.0
