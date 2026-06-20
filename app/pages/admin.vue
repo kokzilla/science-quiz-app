@@ -12,7 +12,8 @@ import {
   Eye, 
   RefreshCw, 
   Grid,
-  FileSpreadsheet
+  FileSpreadsheet,
+  LogOut
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -40,6 +41,12 @@ const questions = ref<any[]>([])
 
 // Progress State
 const dataEntryProgress = ref<any[]>([])
+
+// Progress Detail Modal State
+const showProgressModal = ref(false)
+const modalQuestionNumber = ref(1)
+const unansweredTeams = ref<any[]>([])
+const modalLoading = ref(false)
 
 // Fetch all rounds on mount
 onMounted(async () => {
@@ -435,6 +442,36 @@ const fetchProgress = async () => {
   }
 }
 
+const handleShowProgressDetails = async (qNum: number) => {
+  modalQuestionNumber.value = qNum
+  showProgressModal.value = true
+  modalLoading.value = true
+  unansweredTeams.value = []
+
+  try {
+    if (!supabase.value || !selectedRoundId.value) return
+
+    const roundTeamIds = teams.value.map(t => t.id)
+    if (roundTeamIds.length === 0) return
+
+    const { data: answeredRows } = await supabase.value
+      .from('answers')
+      .select('team_id, submitted_answer')
+      .in('team_id', roundTeamIds)
+      .eq('question_number', qNum)
+
+    const answeredTeamIds = (answeredRows || [])
+      .filter(r => r.submitted_answer)
+      .map(r => r.team_id)
+
+    unansweredTeams.value = teams.value.filter(t => !answeredTeamIds.includes(t.id))
+  } catch (err) {
+    console.error('Error fetching progress details:', err)
+  } finally {
+    modalLoading.value = false
+  }
+}
+
 // Create new Round
 const newRoundName = ref('')
 const handleCreateRound = async () => {
@@ -485,6 +522,13 @@ const handleDeleteRound = async () => {
     }
   }
 }
+
+const handleLogout = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('admin_passkey')
+  }
+  router.push('/')
+}
 </script>
 
 <template>
@@ -505,7 +549,12 @@ const handleDeleteRound = async () => {
         <!-- Admin Passkey input removed to keep UI simple -->
       </div>
       
-      <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+      <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+        <button @click="handleLogout" class="btn btn-secondary" style="display: flex; align-items: center; gap: 0.25rem; height: 42px;">
+          <LogOut :size="16" />
+          <span>ออกจากระบบ</span>
+        </button>
+        
         <input 
           v-model="newRoundName" 
           type="text" 
@@ -815,7 +864,10 @@ const handleDeleteRound = async () => {
             v-for="prog in dataEntryProgress" 
             :key="prog.question_number" 
             class="glass-card" 
-            style="background: rgba(255,255,255,0.02); display: flex; flex-direction: column; gap: 0.5rem;"
+            style="background: rgba(255,255,255,0.02); display: flex; flex-direction: column; gap: 0.5rem; cursor: pointer; transition: transform 0.2s, border-color 0.2s;"
+            @click="handleShowProgressDetails(prog.question_number)"
+            onmouseover="this.style.borderColor='var(--color-cyan)';" 
+            onmouseout="this.style.borderColor='var(--glass-border)';"
           >
             <div style="display: flex; justify-content: space-between; font-weight: 700;">
               <span style="color: var(--color-cyan);">ข้อที่ {{ prog.question_number }}</span>
@@ -844,6 +896,54 @@ const handleDeleteRound = async () => {
     <div v-else style="text-align: center; padding: 5rem 0;">
       <p style="color: var(--text-secondary);">กรุณาเลือกหรือสร้างรอบการแข่งขันเพื่อเปิดใช้งานระบบควบคุม</p>
     </div>
+
+    <!-- Progress Details Modal -->
+    <div v-if="showProgressModal" class="modal-backdrop no-print" @click.self="showProgressModal = false">
+      <div class="glass-card modal-content" style="max-width: 500px; width: 90%; margin: 10% auto; position: relative; padding: 2.2rem; background: var(--bg-secondary); border: 1px solid var(--glass-border-glow); box-shadow: 0 0 30px rgba(0,229,255,0.25);">
+        <button @click="showProgressModal = false" class="btn btn-secondary" style="position: absolute; top: 1rem; right: 1rem; padding: 0; width: 32px; height: 32px; border-radius: 50%; font-size: 1rem; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.05);">
+          ✕
+        </button>
+
+        <h2 style="font-size: 1.4rem; color: var(--color-cyan); margin-bottom: 0.5rem; font-family: var(--font-title);">
+          รายละเอียด ความคืบหน้าข้อที่ {{ modalQuestionNumber }}
+        </h2>
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.5rem;">
+          รายชื่อทีมที่ยังไม่ได้คีย์ตัวเลือกคำตอบลงระบบในข้อนี้
+        </p>
+
+        <div v-if="modalLoading" style="text-align: center; padding: 3rem; color: var(--text-secondary);">
+          <div class="loading-spin" style="width: 32px; height: 32px; border: 3px solid var(--color-cyan); border-top-color: transparent; border-radius: 50%; margin: 0 auto 1rem; animation: spin 1s linear infinite;"></div>
+          กำลังโหลดรายละเอียด...
+        </div>
+
+        <div v-else>
+          <div v-if="unansweredTeams.length === 0" style="text-align: center; color: var(--color-success); padding: 2.5rem; font-weight: 600; font-size: 1.1rem;">
+            ✓ คีย์คะแนนครบถ้วนหมดทุกทีมแล้ว
+          </div>
+          <div v-else style="display: flex; flex-direction: column; gap: 0.65rem; max-height: 320px; overflow-y: auto; padding-right: 0.5rem;">
+            <div 
+              v-for="team in unansweredTeams" 
+              :key="team.id"
+              class="glass-card"
+              style="background: rgba(255, 23, 68, 0.04); border-color: rgba(255, 23, 68, 0.15); padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center;"
+            >
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <span style="font-family: var(--font-title); font-weight: 800; color: var(--color-gold);">
+                  TEAM {{ String(team.team_number).padStart(2, '0') }}
+                </span>
+                <span style="font-weight: 600; color: #fff;">
+                  {{ team.name }}
+                </span>
+              </div>
+              <span class="status-pill pending" style="background: rgba(255, 23, 68, 0.08); color: var(--color-error); font-size: 0.7rem; padding: 0.2rem 0.5rem;">
+                ยังไม่ได้คีย์
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -857,5 +957,12 @@ const handleDeleteRound = async () => {
 }
 .bg-success {
   background: var(--color-success);
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.loading-spin {
+  animation: spin 1s linear infinite;
 }
 </style>

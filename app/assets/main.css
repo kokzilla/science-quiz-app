@@ -310,9 +310,9 @@ button, input, select, textarea {
 
 .scoreboard-row {
   display: grid;
-  grid-template-columns: 80px 100px 1fr 120px;
+  grid-template-columns: 100px 1fr 180px 80px;
   align-items: center;
-  padding: 0.85rem 1.5rem;
+  padding: 1.25rem 2rem;
   background: rgba(20, 24, 48, 0.5);
   border-left: 4px solid transparent;
   border-radius: var(--radius-sm);
@@ -574,6 +574,21 @@ button, input, select, textarea {
 
 .report-table tbody tr:hover {
   background: rgba(255, 255, 255, 0.02);
+}
+
+/* Modals */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* Responsive Navigation */

@@ -8,7 +8,8 @@ import {
   Settings, 
   CheckCircle,
   AlertCircle,
-  Filter
+  Filter,
+  LogOut
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -287,19 +288,34 @@ const isQuestionCompleted = (qNum: number) => {
     return !!answersMap.value[`${t.id}-${qNum}`]
   })
 }
+
+const handleLogout = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('staff_key')
+    localStorage.removeItem('admin_passkey')
+  }
+  router.push('/')
+}
 </script>
 
 <template>
   <div class="container mobile-view" v-if="passkeyValid">
     
     <!-- Header -->
-    <div style="margin-bottom: 1.5rem;">
-      <h1 style="font-size: 1.8rem; background: linear-gradient(135deg, var(--color-cyan), var(--color-purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.25rem;">
-        บันทึกคะแนนคำตอบ
-      </h1>
-      <p style="color: var(--text-secondary); font-size: 0.9rem;">
-        กรอกข้อมูลคำตอบจากกระดาษของทีมเข้าแข่ง
-      </p>
+    <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+      <div>
+        <h1 style="font-size: 1.8rem; background: linear-gradient(135deg, var(--color-cyan), var(--color-purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.25rem;">
+          บันทึกคะแนนคำตอบ
+        </h1>
+        <p style="color: var(--text-secondary); font-size: 0.9rem;">
+          กรอกข้อมูลคำตอบจากกระดาษของทีมเข้าแข่ง
+        </p>
+      </div>
+      
+      <button @click="handleLogout" class="btn btn-secondary" style="display: flex; align-items: center; gap: 0.25rem; padding: 0.5rem 0.75rem; font-size: 0.85rem;">
+        <LogOut :size="16" />
+        <span>ออกจากระบบ</span>
+      </button>
     </div>
 
     <!-- DB Warning -->

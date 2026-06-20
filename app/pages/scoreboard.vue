@@ -17,6 +17,7 @@ const route = useRoute()
 const { supabase, isConfigured } = useSupabase()
 
 const selectedRoundId = ref('')
+const roundsList = ref<any[]>([])
 const sortBy = ref<'score' | 'team'>('score')
 const currentRound = ref<any>(null)
 const teams = ref<any[]>([])
@@ -45,13 +46,7 @@ onMounted(() => {
   selectedRoundId.value = route.query.round as string || ''
   
   if (isConfigured.value) {
-    if (selectedRoundId.value) {
-      loadScoreboardData()
-      setupRealtimeSubscriptions()
-    } else {
-      errorMsg.value = 'ไม่พบรหัสรอบการแข่งขัน (round id) กรุณาเปิดผ่านทางหน้าตั้งค่าหรือบอร์ดแอดมิน'
-      loading.value = false
-    }
+    fetchRounds()
   } else {
     loading.value = false
   }
@@ -59,11 +54,39 @@ onMounted(() => {
   // Auto-scrolling timer
   startScrollTimer()
 
-  // Audio setup (optional web synth/beep since we cannot load local asset files directly)
   if (typeof window !== 'undefined') {
-    cheerAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2018/2018-84.wav') // Retro level up sound
+    cheerAudio = new Audio('https://assets.mixkit.co/active_storage/sfx/2018/2018-84.wav')
   }
 })
+
+const fetchRounds = async () => {
+  if (!supabase.value) return
+  const { data } = await supabase.value
+    .from('rounds')
+    .select('*')
+    .order('created_at', { ascending: false })
+  
+  if (data) {
+    roundsList.value = data
+    if (!selectedRoundId.value && data.length > 0) {
+      selectedRoundId.value = data[0].id
+    }
+  }
+
+  if (selectedRoundId.value) {
+    loadScoreboardData()
+    setupRealtimeSubscriptions()
+  } else {
+    errorMsg.value = 'ยังไม่มีรอบการแข่งขันในระบบ กรุณาเปิดผ่านทางหน้าตั้งค่าหรือบอร์ดแอดมิน'
+    loading.value = false
+  }
+}
+
+const handleRoundChange = () => {
+  loading.value = true
+  loadScoreboardData()
+  setupRealtimeSubscriptions()
+}
 
 onUnmounted(() => {
   cleanupSubscriptions()
@@ -300,6 +323,15 @@ const paginatedLeaderboard = computed(() => {
       </button>
 
       <div style="background: rgba(0,0,0,0.5); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 0.5rem; border: 1px solid var(--glass-border);">
+        <span>เลือกรอบ:</span>
+        <select v-model="selectedRoundId" @change="handleRoundChange" style="background: var(--bg-tertiary); color: #fff; border: none; font-size: 0.75rem; border-radius: 4px; padding: 0.2rem 0.5rem; outline: none; cursor: pointer; max-width: 140px;">
+          <option v-for="r in roundsList" :key="r.id" :value="r.id">
+            {{ r.name }}
+          </option>
+        </select>
+      </div>
+
+      <div style="background: rgba(0,0,0,0.5); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 0.5rem; border: 1px solid var(--glass-border);">
         <span>เรียงลำดับ:</span>
         <button @click="sortBy = 'score'" class="btn" :style="sortBy === 'score' ? 'background: var(--color-cyan); color: #000; font-weight: 700;' : 'background: var(--bg-tertiary); color: #fff;'" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border: none; border-radius: 4px; cursor: pointer;">
           คะแนน
@@ -357,7 +389,7 @@ const paginatedLeaderboard = computed(() => {
           ไม่มีทีมเข้าแข่งในระบบ
         </div>
 
-        <div v-else style="display: flex; flex-direction: column; gap: 0.6rem;">
+        <div v-else class="scoreboard-grid-container">
           <TransitionGroup name="flip-list">
             <div 
               v-for="item in paginatedLeaderboard" 
@@ -365,27 +397,27 @@ const paginatedLeaderboard = computed(() => {
               class="scoreboard-row"
               :class="`rank-${item.rank}`"
             >
-              <!-- Rank badge -->
-              <div class="rank-badge">
-                {{ item.rank }}
-              </div>
-
-              <!-- Team number -->
+              <!-- Team number (Outstanding) -->
               <div class="team-no">
                 TEAM {{ String(item.team_number).padStart(2, '0') }}
               </div>
 
               <!-- Team Name -->
-              <div class="team-name" style="color: #fff; display: flex; align-items: center; gap: 1rem;">
+              <div class="team-name">
                 <span>{{ item.name }}</span>
-                <span v-if="item.tie_breaker_score > 0" class="status-pill" style="background: rgba(255, 214, 0, 0.15); color: var(--color-gold); font-size: 0.7rem; padding: 0.1rem 0.4rem;">
+                <span v-if="item.tie_breaker_score > 0" class="status-pill-tiebreak">
                   ไทเบรก +{{ item.tie_breaker_score }}
                 </span>
               </div>
 
               <!-- Points display -->
               <div class="team-score">
-                {{ item.finalScore }} <span>คะแนน</span>
+                {{ item.finalScore }} <span class="score-label">คะแนน</span>
+              </div>
+
+              <!-- Rank badge (Moved behind score) -->
+              <div class="rank-badge">
+                {{ item.rank }}
               </div>
             </div>
           </TransitionGroup>
@@ -437,5 +469,162 @@ const paginatedLeaderboard = computed(() => {
 .loading-spin {
   animation: spin 1.2s linear infinite;
   box-shadow: var(--shadow-neon-cyan);
+}
+
+/* 2-Column Grid Layout for Scoreboard */
+.scoreboard-grid-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(5, auto);
+  grid-auto-flow: column;
+  gap: 1rem;
+}
+
+.scoreboard-row {
+  display: grid !important;
+  grid-template-columns: 180px 1fr 180px 70px !important;
+  align-items: center !important;
+  padding: 1rem 1.5rem !important;
+  background: rgba(20, 24, 48, 0.5);
+  border-left: 4px solid transparent;
+  border-radius: var(--radius-sm);
+  transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.team-no {
+  font-family: var(--font-title) !important;
+  font-size: 2.2rem !important;
+  font-weight: 800 !important;
+  color: var(--color-cyan) !important;
+  text-shadow: var(--shadow-neon-cyan) !important;
+  white-space: nowrap;
+}
+
+.team-name {
+  color: #fff !important;
+  font-size: 1.8rem !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 1rem !important;
+  font-weight: 700 !important;
+}
+
+.status-pill-tiebreak {
+  background: rgba(255, 214, 0, 0.15);
+  color: var(--color-gold);
+  font-size: 0.85rem;
+  padding: 0.15rem 0.5rem;
+  font-weight: 800;
+  border-radius: 20px;
+  text-transform: uppercase;
+}
+
+.team-score {
+  font-size: 2.5rem !important;
+  font-weight: 800 !important;
+  color: var(--text-primary) !important;
+  text-align: right !important;
+}
+
+.score-label {
+  font-size: 1.2rem !important;
+  font-weight: 400 !important;
+  color: var(--text-secondary) !important;
+  margin-left: 0.25rem !important;
+}
+
+.rank-badge {
+  width: 52px !important;
+  height: 52px !important;
+  font-size: 1.4rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  font-family: var(--font-title) !important;
+  font-weight: 800 !important;
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+  justify-self: end;
+}
+
+/* Media Queries for responsive scaling and vertical stack on small screens */
+@media (max-width: 1400px) {
+  .scoreboard-row {
+    grid-template-columns: 165px 1fr 160px 60px !important;
+    padding: 0.85rem 1.25rem !important;
+  }
+  .team-no {
+    font-size: 1.8rem !important;
+  }
+  .team-name {
+    font-size: 1.5rem !important;
+  }
+  .team-score {
+    font-size: 2rem !important;
+  }
+  .score-label {
+    font-size: 1rem !important;
+  }
+  .rank-badge {
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 1.2rem !important;
+  }
+}
+
+@media (max-width: 992px) {
+  .scoreboard-grid-container {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    grid-auto-flow: row;
+  }
+  .scoreboard-row {
+    grid-template-columns: 140px 1fr 140px 50px !important;
+    padding: 0.75rem 1rem !important;
+  }
+  .team-no {
+    font-size: 1.5rem !important;
+  }
+  .team-name {
+    font-size: 1.3rem !important;
+  }
+  .team-score {
+    font-size: 1.75rem !important;
+  }
+  .score-label {
+    font-size: 0.9rem !important;
+  }
+  .rank-badge {
+    width: 38px !important;
+    height: 38px !important;
+    font-size: 1rem !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .scoreboard-row {
+    grid-template-columns: 95px 1fr 100px 36px !important;
+    padding: 0.6rem 0.75rem !important;
+    gap: 0.5rem !important;
+  }
+  .team-no {
+    font-size: 1.1rem !important;
+  }
+  .team-name {
+    font-size: 1rem !important;
+    gap: 0.25rem !important;
+  }
+  .team-score {
+    font-size: 1.3rem !important;
+  }
+  .score-label {
+    font-size: 0.75rem !important;
+  }
+  .rank-badge {
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 0.9rem !important;
+  }
 }
 </style>

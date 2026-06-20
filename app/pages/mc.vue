@@ -24,6 +24,7 @@ const currentRound = ref<any>(null)
 const teams = ref<any[]>([])
 const questions = ref<any[]>([])
 const answers = ref<any[]>([])
+const dataEntryProgress = ref<any[]>([])
 
 const selectedQuestion = ref(1)
 const loading = ref(true)
@@ -117,12 +118,14 @@ const handleRoundChange = async () => {
     questions.value = qData || []
 
     await fetchAnswers()
+    await fetchProgress()
     
     // Subscribe to realtime answer updates
     supabase.value
       .channel('mc-answers')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'answers' }, () => {
         fetchAnswers()
+        fetchProgress()
       })
       .subscribe()
       
@@ -130,6 +133,48 @@ const handleRoundChange = async () => {
     console.error(err)
   } finally {
     loading.value = false
+  }
+}
+
+const fetchProgress = async () => {
+  if (!supabase.value || !selectedRoundId.value) return
+  
+  const { data: countData } = await supabase.value
+    .rpc('get_answers_progress', { r_id: selectedRoundId.value })
+  
+  if (countData) {
+    dataEntryProgress.value = countData
+  } else {
+    // Fallback
+    const roundTeamIds = teams.value.map(t => t.id)
+    if (roundTeamIds.length === 0) {
+      dataEntryProgress.value = Array.from({ length: 20 }, (_, i) => ({
+        question_number: i + 1,
+        submitted_count: 0
+      }))
+      return
+    }
+
+    const { data: answersData } = await supabase.value
+      .from('answers')
+      .select('question_number, submitted_answer')
+      .in('team_id', roundTeamIds)
+      
+    const counts: Record<number, number> = {}
+    for (let i = 1; i <= 20; i++) counts[i] = 0
+    
+    if (answersData) {
+      answersData.forEach(ans => {
+        if (ans.submitted_answer) {
+          counts[ans.question_number] = (counts[ans.question_number] || 0) + 1
+        }
+      })
+    }
+    
+    dataEntryProgress.value = Object.keys(counts).map(k => ({
+      question_number: parseInt(k),
+      submitted_count: counts[parseInt(k)]
+    }))
   }
 }
 
@@ -163,6 +208,10 @@ const correctTeamsList = computed(() => {
 })
 
 const handleExit = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('staff_key')
+    localStorage.removeItem('admin_passkey')
+  }
   router.push('/')
 }
 </script>
@@ -181,7 +230,7 @@ const handleExit = () => {
 
       <button @click="handleExit" class="btn btn-secondary" style="display: flex; align-items: center; gap: 0.25rem;">
         <LogOut :size="16" />
-        <span>ออกจากหน้าพิธีกร</span>
+        <span>ออกจากระบบ MC</span>
       </button>
     </div>
 
@@ -290,24 +339,71 @@ const handleExit = () => {
             <p>ยังไม่มีทีมที่ตอบถูกในข้อนี้</p>
           </div>
 
-          <div v-else style="display: flex; flex-direction: column; gap: 0.65rem; overflow-y: auto; flex: 1; max-height: 500px; padding-right: 0.5rem;">
+          <div v-else style="display: flex; flex-direction: column; gap: 1rem; overflow-y: auto; flex: 1; max-height: 500px; padding-right: 0.5rem;">
             <div 
               v-for="team in correctTeamsList" 
               :key="team.id"
               class="glass-card"
-              style="background: rgba(0, 230, 118, 0.05); border-color: rgba(0, 230, 118, 0.2); padding: 0.85rem 1.25rem; display: flex; align-items: center; justify-content: space-between;"
+              style="background: rgba(0, 230, 118, 0.05); border-color: rgba(0, 230, 118, 0.2); padding: 1.5rem 2.5rem; display: flex; align-items: center; justify-content: space-between;"
             >
-              <div style="display: flex; align-items: center; gap: 1rem;">
-                <span style="font-family: var(--font-title); font-weight: 800; font-size: 1.15rem; color: var(--color-gold);">
+              <div style="display: flex; align-items: center; gap: 2rem;">
+                <span style="font-family: var(--font-title); font-weight: 800; font-size: 2.6rem; color: var(--color-gold); text-shadow: var(--shadow-neon-cyan);">
                   TEAM {{ String(team.team_number).padStart(2, '0') }}
                 </span>
-                <span style="font-size: 1.15rem; font-weight: 600; color: #fff;">{{ team.name }}</span>
+                <span style="font-size: 2.4rem; font-weight: 700; color: #fff;">{{ team.name }}</span>
               </div>
-              <CheckCircle :size="20" style="color: var(--color-success);" />
+              <CheckCircle :size="48" style="color: var(--color-success);" />
             </div>
           </div>
         </div>
 
+      </div>
+
+      <!-- Bottom: Data Entry Progress for MC -->
+      <div class="glass-card" style="margin-top: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+          <div>
+            <h3 style="font-size: 1.25rem; color: #fff;">ความคืบหน้าการบันทึกข้อมูลคำตอบ (คีย์ครบถ้วนแสดงเป็นสีเขียว)</h3>
+            <p style="color: var(--text-secondary); font-size: 0.85rem;">
+              ตรวจสอบว่าคำตอบถูกบันทึกเข้าระบบครบทุกทีมแล้วหรือไม่ (มีทีมทั้งหมด {{ teams.length }} ทีม)
+            </p>
+          </div>
+          <button @click="fetchProgress" class="btn btn-secondary" style="display: flex; align-items: center; gap: 0.25rem;">
+            <RefreshCw :size="14" />
+            <span>รีเฟรชความคืบหน้า</span>
+          </button>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem;">
+          <div 
+            v-for="prog in dataEntryProgress" 
+            :key="prog.question_number" 
+            class="glass-card" 
+            :style="prog.submitted_count === teams.length 
+              ? 'border-color: rgba(0, 230, 118, 0.4); background: rgba(0, 230, 118, 0.04); display: flex; flex-direction: column; gap: 0.5rem;' 
+              : 'display: flex; flex-direction: column; gap: 0.5rem;'"
+          >
+            <div style="display: flex; justify-content: space-between; font-weight: 700;">
+              <span :style="prog.submitted_count === teams.length ? 'color: var(--color-success);' : 'color: var(--color-cyan);'">ข้อที่ {{ prog.question_number }}</span>
+              <span :style="prog.submitted_count === teams.length ? 'color: var(--color-success); font-weight: 800;' : ''">
+                {{ prog.submitted_count }} / {{ teams.length }} ทีม
+              </span>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+              <div 
+                :style="`width: ${teams.length > 0 ? (prog.submitted_count / teams.length) * 100 : 0}%`"
+                :class="prog.submitted_count === teams.length ? 'bg-success' : 'bg-cyan'"
+                style="height: 100%; border-radius: 3px;"
+              ></div>
+            </div>
+
+            <div style="font-size: 0.75rem; text-align: right;" :style="prog.submitted_count === teams.length ? 'color: var(--color-success); font-weight: 800;' : 'color: var(--text-secondary);'">
+              {{ prog.submitted_count === teams.length ? 'บันทึกครบถ้วนแล้ว' : 'ยังบันทึกไม่ครบ' }}
+            </div>
+          </div>
+        </div>
       </div>
     </template>
   </div>
