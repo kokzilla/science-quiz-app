@@ -15,6 +15,9 @@ import {
   LogOut,
   AlertCircle,
   Volume2,
+  VolumeX,
+  Mic,
+  MicOff,
   CheckCircle,
   Clock
 } from 'lucide-vue-next'
@@ -38,8 +41,13 @@ const errorMsg = ref('')
 // Realtime subscriptions
 let answersChannel: any = null
 let roundChannel: any = null
+let configChannel: any = null
 let autoTimerTimeout: any = null
 const isLoaded = ref(false)
+
+// Audio settings refs
+const soundEnabled = ref(true)
+const ttsEnabled = ref(true)
 
 const cleanupSubscriptions = () => {
   if (answersChannel && supabase.value) {
@@ -50,6 +58,49 @@ const cleanupSubscriptions = () => {
     supabase.value.removeChannel(roundChannel)
     roundChannel = null
   }
+  if (configChannel && supabase.value) {
+    supabase.value.removeChannel(configChannel)
+    configChannel = null
+  }
+}
+
+const setupConfigChannel = () => {
+  if (!supabase.value || !selectedRoundId.value) return
+  
+  if (configChannel) {
+    supabase.value.removeChannel(configChannel)
+    configChannel = null
+  }
+  
+  configChannel = supabase.value.channel(`presenter-config-${selectedRoundId.value}`)
+  configChannel
+    .on('broadcast', { event: 'request_audio_settings' }, () => {
+      sendAudioSettings()
+    })
+    .subscribe()
+}
+
+const sendAudioSettings = () => {
+  if (configChannel) {
+    configChannel.send({
+      type: 'broadcast',
+      event: 'audio_settings',
+      payload: {
+        soundEnabled: soundEnabled.value,
+        ttsEnabled: ttsEnabled.value
+      }
+    })
+  }
+}
+
+const toggleSound = () => {
+  soundEnabled.value = !soundEnabled.value
+  sendAudioSettings()
+}
+
+const toggleTts = () => {
+  ttsEnabled.value = !ttsEnabled.value
+  sendAudioSettings()
 }
 
 onUnmounted(() => {
@@ -167,6 +218,9 @@ const handleRoundChange = async () => {
 
     // Clean up old subscriptions first
     cleanupSubscriptions()
+
+    // Setup audio config broadcast channel
+    setupConfigChannel()
 
     // Subscribe to realtime answer updates (to show stats)
     answersChannel = supabase.value
@@ -298,7 +352,36 @@ const handleExit = () => {
           
           <!-- State controller card -->
           <div class="glass-card controller-card">
-            <h2 class="section-title">ปุ่มควบคุมจอเวที</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;">
+              <h2 class="section-title" style="margin: 0; border: none; padding: 0;">ปุ่มควบคุมจอเวที</h2>
+              
+              <!-- Audio Controls -->
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button 
+                  @click="toggleTts" 
+                  class="btn" 
+                  :class="ttsEnabled ? 'btn-primary' : 'btn-secondary'"
+                  style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; display: flex; align-items: center; gap: 0.25rem; margin: 0;"
+                  :title="ttsEnabled ? 'เสียงพูดอ่านโจทย์/ผู้ชนะ: เปิด' : 'เสียงพูดอ่านโจทย์/ผู้ชนะ: ปิด'"
+                >
+                  <Mic v-if="ttsEnabled" :size="14" />
+                  <MicOff v-else :size="14" />
+                  <span>เสียงพูด: {{ ttsEnabled ? 'เปิด' : 'ปิด' }}</span>
+                </button>
+
+                <button 
+                  @click="toggleSound" 
+                  class="btn" 
+                  :class="soundEnabled ? 'btn-primary' : 'btn-secondary'"
+                  style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; display: flex; align-items: center; gap: 0.25rem; margin: 0;"
+                  :title="soundEnabled ? 'เสียงเตือนเวลานับถอยหลัง: เปิด' : 'เสียงเตือนเวลานับถอยหลัง: ปิด'"
+                >
+                  <Volume2 v-if="soundEnabled" :size="14" />
+                  <VolumeX v-else :size="14" />
+                  <span>เสียงนาฬิกา: {{ soundEnabled ? 'เปิด' : 'ปิด' }}</span>
+                </button>
+              </div>
+            </div>
             
             <div class="active-question-display">
               <span class="active-q-label">ข้อคำถามที่เลือก</span>

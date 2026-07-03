@@ -43,6 +43,7 @@ let timerInterval: any = null
 // Realtime subscriptions
 let roundChannel: any = null
 let answersChannel: any = null
+let configChannel: any = null
 
 // Question Intro state
 const showQuestionIntro = ref(false)
@@ -324,10 +325,31 @@ const setupRealtimeSubscription = () => {
       }
     })
     .subscribe()
+
+  // Listen to audio config broadcast channel
+  configChannel = supabase.value.channel(`presenter-config-${selectedRoundId.value}`)
+  configChannel
+    .on('broadcast', { event: 'audio_settings' }, ({ payload }) => {
+      soundEnabled.value = payload.soundEnabled
+      ttsEnabled.value = payload.ttsEnabled
+    })
+    .subscribe((status: string) => {
+      if (status === 'SUBSCRIBED') {
+        // Request current settings from the admin panel
+        configChannel.send({
+          type: 'broadcast',
+          event: 'request_audio_settings'
+        })
+      }
+    })
 }
 
 const cleanupSubscriptions = () => {
   if (roundChannel) supabase.value?.removeChannel(roundChannel)
+  if (configChannel) {
+    supabase.value?.removeChannel(configChannel)
+    configChannel = null
+  }
 }
 
 // Timer and Sound synchronization logic
