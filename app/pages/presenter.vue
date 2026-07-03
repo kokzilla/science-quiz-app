@@ -51,6 +51,18 @@ let introTimeout: any = null
 let speakTimeout: any = null
 let correctTeamsSpeakTimeout: any = null
 
+const hasThaiVoice = ref(false)
+
+const checkThaiVoicePresence = () => {
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+    hasThaiVoice.value = false
+    return
+  }
+  const voices = window.speechSynthesis.getVoices()
+  const hasVoice = voices.some(v => v.lang.startsWith('th') || v.lang.includes('TH'))
+  hasThaiVoice.value = hasVoice
+}
+
 onMounted(async () => {
   selectedRoundId.value = route.query.round as string || ''
   
@@ -70,7 +82,9 @@ onMounted(async () => {
       window.speechSynthesis.getVoices()
       window.speechSynthesis.onvoiceschanged = () => {
         window.speechSynthesis.getVoices()
+        checkThaiVoicePresence()
       }
+      checkThaiVoicePresence()
     }
   }
 })
@@ -187,12 +201,12 @@ const getThaiMaleVoice = () => {
   const voices = window.speechSynthesis.getVoices()
   
   // Filter for Thai voices
-  const thaiVoices = voices.filter(v => v.lang.toLowerCase().startsWith('th'))
+  const thaiVoices = voices.filter(v => v.lang.toLowerCase().startsWith('th') || v.lang.toLowerCase().includes('th'))
   if (thaiVoices.length === 0) return null
 
-  // Prefer Pattara (Windows male), Niwat (macOS male) or any name containing "pattara", "niwat", "male"
-  const maleKeywords = ['pattara', 'niwat', 'male']
-  for (const keyword of maleKeywords) {
+  // Prioritize premium/natural/specific voices (e.g. Premwadee for Edge Online, Ajchara for clear Windows Speech, Pattara for offline)
+  const voiceKeywords = ['premwadee', 'ajchara', 'pattara', 'niwat', 'narisa', 'google', 'male']
+  for (const keyword of voiceKeywords) {
     const found = thaiVoices.find(v => v.name.toLowerCase().includes(keyword))
     if (found) return found
   }
@@ -547,7 +561,26 @@ const handlePageClick = () => {
     </div>
 
     <!-- Configuration selector (no-print floating top right for testing) -->
-    <div class="no-print" style="position: absolute; top: 1rem; right: 1rem; display: flex; gap: 0.5rem; z-index: 99;">
+    <div class="no-print" style="position: absolute; top: 1rem; right: 1rem; display: flex; gap: 0.5rem; align-items: center; z-index: 99;">
+      
+      <!-- Thai Voice Status Badge -->
+      <div 
+        v-if="!hasThaiVoice" 
+        style="background: rgba(255, 23, 68, 0.15); border: 1px solid rgba(255, 23, 68, 0.3); color: #ff5252; padding: 0.35rem 0.85rem; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem; font-weight: 600; box-shadow: 0 0 10px rgba(255, 82, 82, 0.1);"
+        title="เบราว์เซอร์นี้ไม่มีเสียงภาษาไทยติดตั้งไว้ หรือเสียงกำลังโหลด (แนะนำให้เปิดด้วย Microsoft Edge)"
+      >
+        <span style="width: 8px; height: 8px; background: #ff5252; border-radius: 50%; display: inline-block; animation: pulseRed 1.2s infinite alternate;"></span>
+        <span>ไม่พบเสียงภาษาไทย (แนะนำใช้ Edge)</span>
+      </div>
+      <div 
+        v-else 
+        style="background: rgba(0, 230, 118, 0.1); border: 1px solid rgba(0, 230, 118, 0.25); color: #00e676; padding: 0.35rem 0.85rem; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem; font-weight: 600;"
+        title="เสียงสังเคราะห์ภาษาไทยพร้อมใช้งาน"
+      >
+        <span style="width: 8px; height: 8px; background: #00e676; border-radius: 50%; display: inline-block;"></span>
+        <span>เสียงภาษาไทยพร้อมใช้งาน</span>
+      </div>
+
       <button 
         @click="ttsEnabled = !ttsEnabled" 
         class="btn btn-secondary" 
@@ -1453,6 +1486,11 @@ const handlePageClick = () => {
   0% { transform: translate(-50%, 0) scale(1); opacity: 0.9; }
   50% { transform: translate(-50%, -4px) scale(1.02); opacity: 1; box-shadow: 0 0 30px rgba(0, 229, 255, 0.35); }
   100% { transform: translate(-50%, 0) scale(1); opacity: 0.9; }
+}
+
+@keyframes pulseRed {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.3); opacity: 1; }
 }
 
 @keyframes fadeIn {
