@@ -337,6 +337,8 @@ const syncTimerState = () => {
 
   if (state === 'timer_start' && startAt) {
     startLocalTimer(startAt)
+  } else if (state === 'sample_question') {
+    startLocalSampleTimer()
   } else {
     stopLocalTimer()
     stopSounds()
@@ -347,6 +349,36 @@ const startLocalTimer = (startedAtIso: string) => {
   stopLocalTimer()
   
   const startedAt = new Date(startedAtIso).getTime()
+  
+  const updateTimer = () => {
+    const now = Date.now()
+    const elapsed = Math.floor((now - startedAt) / 1000)
+    const remaining = Math.max(0, 30 - elapsed)
+    
+    timerRemaining.value = remaining
+
+    if (remaining > 0) {
+      timerActive.value = true
+      if (remaining <= 5) {
+        playTick()
+      } else {
+        stopSounds()
+      }
+    } else {
+      timerActive.value = false
+      stopLocalTimer()
+      playAlarm()
+    }
+  }
+
+  updateTimer() // run once immediately
+  timerInterval = setInterval(updateTimer, 500)
+}
+
+const startLocalSampleTimer = () => {
+  stopLocalTimer()
+  
+  const startedAt = Date.now()
   
   const updateTimer = () => {
     const now = Date.now()
@@ -542,7 +574,7 @@ const handlePageClick = () => {
         </Transition>
 
         <!-- Timer countdown overlay widget -->
-        <div v-if="currentRound.presenter_show_state === 'timer_start'" class="timer-overlay">
+        <div v-if="currentRound.presenter_show_state === 'timer_start' || currentRound.presenter_show_state === 'sample_question'" class="timer-overlay">
           <div class="timer-circle" :class="{ 'timer-warning': timerRemaining <= 5 }">
             <div class="timer-seconds">{{ timerRemaining }}</div>
             <div class="timer-label">วินาที</div>
