@@ -1253,7 +1253,7 @@ const handleRoundChange = () => {
   font-family: var(--font-body);
   font-size: 3.4rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-primary);
   margin-bottom: 1.5rem;
 }
 
@@ -1262,7 +1262,7 @@ const handleRoundChange = () => {
   font-size: 2.2rem;
   color: var(--text-secondary);
   border: 1px solid var(--glass-border);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--bg-primary);
   padding: 0.75rem 2.5rem;
   border-radius: 40px;
   display: inline-block;
