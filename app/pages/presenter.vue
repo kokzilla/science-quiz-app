@@ -1473,10 +1473,10 @@ const handlePageClick = () => {
 
 .rules-title {
   font-family: var(--font-title);
-  font-size: 4.8rem;
+  font-size: 6.2rem;
   font-weight: 800;
   color: #fff;
-  margin-bottom: 3.5rem;
+  margin-bottom: 4.5rem;
   background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -1486,13 +1486,13 @@ const handlePageClick = () => {
 .rules-content-card {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  padding: 4rem 6rem;
+  padding: 5rem 8rem;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
-  gap: 2.5rem;
-  max-width: 800px;
+  gap: 3.5rem;
+  max-width: 900px;
   width: 100%;
 }
 
@@ -1500,28 +1500,28 @@ const handlePageClick = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1.5rem;
+  gap: 2.5rem;
 }
 
 .rule-icon {
-  font-size: 3rem;
+  font-size: 4.2rem;
 }
 
 .rule-text {
-  font-size: 2.2rem;
+  font-size: 3.4rem;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .highlight-yellow {
   color: var(--color-gold);
-  font-size: 2.6rem;
+  font-size: 4.2rem;
   font-weight: 800;
 }
 
 .highlight-cyan {
   color: var(--color-cyan);
-  font-size: 2.6rem;
+  font-size: 4.2rem;
   font-weight: 800;
 }
 
@@ -1539,29 +1539,29 @@ const handlePageClick = () => {
   background: rgba(213, 0, 249, 0.15);
   border: 1px solid rgba(213, 0, 249, 0.3);
   color: var(--color-purple);
-  padding: 0.5rem 1.5rem;
+  padding: 0.6rem 2rem;
   border-radius: 20px;
-  font-size: 1.2rem;
+  font-size: 1.8rem;
   font-weight: 700;
   align-self: center;
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
   letter-spacing: 1px;
 }
 
 .sample-q-text {
-  font-size: 3rem;
+  font-size: 4.8rem;
   font-weight: 700;
   color: #fff;
   text-align: center;
-  margin-bottom: 3.5rem;
+  margin-bottom: 4.5rem;
   line-height: 1.5;
 }
 
 .sample-choices-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  max-width: 1000px;
+  gap: 3rem;
+  max-width: 1200px;
   margin: 0 auto;
   width: 100%;
 }
@@ -1569,29 +1569,30 @@ const handlePageClick = () => {
 .sample-choice-card {
   background: rgba(255, 255, 255, 0.02);
   border: 1px solid var(--glass-border);
-  padding: 2rem;
+  padding: 2.5rem 3rem;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 2.2rem;
   transition: transform 0.3s ease;
 }
 
 .sample-choice-letter {
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
+  font-size: 2.2rem;
   font-weight: 700;
   color: #fff;
+  flex-shrink: 0;
 }
 
 .sample-choice-text {
-  font-size: 1.8rem;
+  font-size: 2.8rem;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -1626,34 +1627,39 @@ const handlePageClick = () => {
 
 .get-ready-title {
   font-family: var(--font-title);
-  font-size: 4.8rem;
+  font-size: 6.2rem;
   font-weight: 800;
   background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   filter: drop-shadow(0 0 20px rgba(0, 229, 255, 0.15));
-  margin-bottom: 1.5rem;
+  margin-bottom: 2rem;
 }
 
 .get-ready-subtitle {
-  font-size: 2.2rem;
+  font-size: 3.4rem;
   color: var(--text-secondary);
-  margin-bottom: 4rem;
+  margin-bottom: 5rem;
 }
 
 .get-ready-waiting-box {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1.2rem;
-  font-size: 1.8rem;
+  gap: 1.8rem;
+  font-size: 2.8rem;
   color: var(--color-cyan);
   font-weight: 600;
   background: rgba(0, 229, 255, 0.04);
   border: 1px solid rgba(0, 229, 255, 0.15);
-  padding: 1.5rem 3rem;
-  border-radius: 40px;
-  box-shadow: 0 0 15px rgba(0, 229, 255, 0.05);
+  padding: 2rem 4rem;
+  border-radius: 50px;
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.05);
+}
+
+.get-ready-waiting-box .pulse-ring {
+  width: 20px;
+  height: 20px;
 }
 
 /* Light theme tweaks for pre-competition */
@@ -1705,36 +1711,45 @@ const handlePageClick = () => {
     min-height: 60vh;
   }
   .rules-title, .get-ready-title {
-    font-size: 3.8rem;
+    font-size: 4.8rem;
     margin-bottom: 2rem;
   }
   .rules-content-card {
-    padding: 2.5rem 4rem;
-    gap: 1.5rem;
+    padding: 3.5rem 5rem;
+    gap: 2rem;
   }
   .rule-text {
-    font-size: 1.8rem;
+    font-size: 2.4rem;
   }
   .highlight-yellow, .highlight-cyan {
-    font-size: 2.1rem;
+    font-size: 3rem;
+  }
+  .sample-badge {
+    font-size: 1.4rem;
   }
   .sample-q-text {
-    font-size: 2.4rem;
-    margin-bottom: 2rem;
+    font-size: 3.4rem;
+    margin-bottom: 3rem;
   }
   .sample-choice-card {
-    padding: 1.2rem;
+    padding: 1.8rem 2rem;
+    gap: 1.5rem;
+  }
+  .sample-choice-letter {
+    width: 52px;
+    height: 52px;
+    font-size: 1.8rem;
   }
   .sample-choice-text {
-    font-size: 1.5rem;
+    font-size: 2rem;
   }
   .get-ready-subtitle {
-    font-size: 1.8rem;
-    margin-bottom: 2.5rem;
+    font-size: 2.4rem;
+    margin-bottom: 3rem;
   }
   .get-ready-waiting-box {
-    font-size: 1.4rem;
-    padding: 1rem 2rem;
+    font-size: 2rem;
+    padding: 1.2rem 2.5rem;
   }
 }
 
@@ -1744,38 +1759,46 @@ const handlePageClick = () => {
     min-height: 50vh;
   }
   .rules-title, .get-ready-title {
-    font-size: 2.8rem;
+    font-size: 3.6rem;
     margin-bottom: 1.5rem;
   }
   .rules-content-card {
-    padding: 1.5rem 2rem;
-    gap: 1rem;
+    padding: 2.5rem 3rem;
+    gap: 1.5rem;
   }
   .rule-text {
-    font-size: 1.5rem;
+    font-size: 1.8rem;
   }
   .highlight-yellow, .highlight-cyan {
-    font-size: 1.7rem;
+    font-size: 2.2rem;
+  }
+  .sample-badge {
+    font-size: 1.2rem;
+    margin-bottom: 1.5rem;
   }
   .sample-q-text {
-    font-size: 2rem;
-    margin-bottom: 1.5rem;
+    font-size: 2.6rem;
+    margin-bottom: 2rem;
   }
   .sample-choice-card {
-    padding: 1rem;
-    gap: 1rem;
+    padding: 1.2rem 1.5rem;
+    gap: 1.2rem;
   }
   .sample-choice-letter {
-    width: 36px;
-    height: 36px;
-    font-size: 1.2rem;
+    width: 44px;
+    height: 44px;
+    font-size: 1.4rem;
   }
   .sample-choice-text {
-    font-size: 1.3rem;
+    font-size: 1.6rem;
   }
   .get-ready-subtitle {
-    font-size: 1.5rem;
-    margin-bottom: 1.5rem;
+    font-size: 1.8rem;
+    margin-bottom: 2rem;
+  }
+  .get-ready-waiting-box {
+    font-size: 1.6rem;
+    padding: 1rem 2rem;
   }
 }
 </style>

@@ -296,56 +296,6 @@ const handleExit = () => {
         <!-- LEFT COLUMN: ACTIVE COMMAND CONTROLLER -->
         <div style="display: flex; flex-direction: column; gap: 1.5rem;">
           
-          <!-- Pre-competition sequence controller card -->
-          <div class="glass-card controller-card" style="border-color: rgba(213, 0, 249, 0.25);">
-            <h2 class="section-title" style="color: var(--color-purple); display: flex; align-items: center; gap: 0.5rem; border-bottom-color: rgba(213, 0, 249, 0.15);">
-              <Sliders :size="20" style="color: var(--color-purple);" />
-              <span>ขั้นตอนก่อนเริ่มการแข่งขัน</span>
-            </h2>
-            
-            <div class="control-actions-stack" style="margin-top: 1rem;">
-              <button 
-                @click="updatePresenterState(1, 'welcome')"
-                class="btn control-btn"
-                :class="currentRound.presenter_show_state === 'welcome' ? 'btn-primary active-btn' : 'btn-secondary'"
-              >
-                <span>1. หน้าต้อนรับ (Welcome State)</span>
-              </button>
-              
-              <button 
-                @click="updatePresenterState(1, 'rules')"
-                class="btn control-btn"
-                :class="currentRound.presenter_show_state === 'rules' ? 'btn-primary active-btn' : 'btn-secondary'"
-              >
-                <span>2. กติกาและเวลาตอบคำถาม</span>
-              </button>
-              
-              <button 
-                @click="updatePresenterState(1, 'sample_question')"
-                class="btn control-btn"
-                :class="currentRound.presenter_show_state === 'sample_question' ? 'btn-primary active-btn' : 'btn-secondary'"
-              >
-                <span>3. ข้อสอบตัวอย่าง</span>
-              </button>
-              
-              <button 
-                @click="updatePresenterState(1, 'sample_answer')"
-                class="btn control-btn"
-                :class="currentRound.presenter_show_state === 'sample_answer' ? 'btn-primary active-btn' : 'btn-secondary'"
-              >
-                <span>4. เฉลยข้อสอบตัวอย่าง</span>
-              </button>
-              
-              <button 
-                @click="updatePresenterState(1, 'get_ready')"
-                class="btn control-btn"
-                :class="currentRound.presenter_show_state === 'get_ready' ? 'btn-primary active-btn' : 'btn-secondary'"
-              >
-                <span>5. เตรียมพร้อมแข่งขัน (Get Ready)</span>
-              </button>
-            </div>
-          </div>
-
           <!-- State controller card -->
           <div class="glass-card controller-card">
             <h2 class="section-title">ปุ่มควบคุมจอเวที</h2>
@@ -448,8 +398,67 @@ const handleExit = () => {
         </div>
 
         <!-- RIGHT COLUMN: Q1-Q20 SELECTOR GRID & STATS -->
-        <div class="glass-card" style="display: flex; flex-direction: column; gap: 1.5rem;">
-          <h2 class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="glass-card" style="display: flex; flex-direction: column; gap: 1.25rem;">
+          
+          <!-- Pre-competition sequence (horizontal & compact) -->
+          <div style="border: 1px solid rgba(213, 0, 249, 0.2); padding: 1rem; border-radius: var(--radius-md); background: rgba(213, 0, 249, 0.02); display: flex; flex-direction: column; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+              <h3 style="font-size: 1rem; font-weight: 700; color: var(--color-purple); display: flex; align-items: center; gap: 0.4rem; margin: 0;">
+                <Sliders :size="16" style="color: var(--color-purple);" />
+                <span>ขั้นตอนก่อนเริ่มการแข่งขัน (Pre-competition Sequence)</span>
+              </h3>
+              <span style="font-size: 0.75rem; color: var(--text-secondary);">คลิกเลือกหัวข้อเพื่อให้หน้าจอเวทีแสดงผลตามลำดับ</span>
+            </div>
+            
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button 
+                @click="updatePresenterState(1, 'welcome')"
+                class="btn control-btn"
+                :class="currentRound.presenter_show_state === 'welcome' ? 'btn-primary active-btn' : 'btn-secondary'"
+                style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; flex: 1; min-width: 130px; margin: 0;"
+              >
+                <span>1. หน้าต้อนรับ</span>
+              </button>
+              
+              <button 
+                @click="updatePresenterState(1, 'rules')"
+                class="btn control-btn"
+                :class="currentRound.presenter_show_state === 'rules' ? 'btn-primary active-btn' : 'btn-secondary'"
+                style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; flex: 1; min-width: 130px; margin: 0;"
+              >
+                <span>2. กติกาและเวลา</span>
+              </button>
+              
+              <button 
+                @click="updatePresenterState(1, 'sample_question')"
+                class="btn control-btn"
+                :class="currentRound.presenter_show_state === 'sample_question' ? 'btn-primary active-btn' : 'btn-secondary'"
+                style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; flex: 1; min-width: 120px; margin: 0;"
+              >
+                <span>3. ข้อสอบตัวอย่าง</span>
+              </button>
+              
+              <button 
+                @click="updatePresenterState(1, 'sample_answer')"
+                class="btn control-btn"
+                :class="currentRound.presenter_show_state === 'sample_answer' ? 'btn-primary active-btn' : 'btn-secondary'"
+                style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; flex: 1; min-width: 120px; margin: 0;"
+              >
+                <span>4. เฉลยตัวอย่าง</span>
+              </button>
+              
+              <button 
+                @click="updatePresenterState(1, 'get_ready')"
+                class="btn control-btn"
+                :class="currentRound.presenter_show_state === 'get_ready' ? 'btn-primary active-btn' : 'btn-secondary'"
+                style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; flex: 1; min-width: 130px; margin: 0;"
+              >
+                <span>5. เตรียมพร้อมแข่ง</span>
+              </button>
+            </div>
+          </div>
+
+          <h2 class="section-title" style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; border-top: 1px solid var(--glass-border); padding-top: 1rem;">
             <span>คลังคำถามของรอบการแข่งนี้</span>
             <button @click="handleRoundChange" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; gap: 0.25rem;">
               <RefreshCw :size="12" />
