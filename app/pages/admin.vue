@@ -556,6 +556,40 @@ const handleEditRoundName = async () => {
   }
 }
 
+const handleResetRound = async () => {
+  if (!supabase.value || !selectedRoundId.value || !currentRound.value) return
+  if (!adminPasskey.value) {
+    alert('กรุณากรอกรหัสผ่านแอดมินก่อนดำเนินการ')
+    return
+  }
+  
+  const confirmed1 = confirm(`คำเตือน: คุณกำลังจะเริ่มการแข่งขันใหม่สำหรับรอบ "${currentRound.value.name}"\n\nการกระทำนี้จะลบคำตอบและการบันทึกคะแนนทั้งหมดของทุกทีมในรอบนี้! คุณต้องการดำเนินการต่อหรือไม่?`)
+  if (!confirmed1) return
+
+  const confirmed2 = confirm(`กรุณายืนยันอีกครั้งว่าต้องการลบข้อมูลคะแนนทั้งหมดและเริ่มการแข่งขันใหม่ตั้งแต่ข้อที่ 1`)
+  if (!confirmed2) return
+
+  try {
+    const { error } = await supabase.value.rpc('manage_round_secure', {
+      p_action: 'reset',
+      p_round_name: '',
+      p_status: '',
+      p_reveal_q: 0,
+      p_round_id: selectedRoundId.value,
+      p_admin_passkey: adminPasskey.value
+    })
+
+    if (error) throw error
+    
+    alert('รีเซ็ตรอบการแข่งขันเรียบร้อยแล้ว คะแนนทั้งหมดถูกล้าง และรอบถูกย้ายไปที่ข้อที่ 1')
+    
+    // Reload state
+    await handleRoundChange()
+  } catch (err: any) {
+    alert(`ไม่สามารถรีเซ็ตรอบการแข่งขันได้: ${err.message}`)
+  }
+}
+
 const handleLogout = () => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('admin_passkey')
@@ -907,6 +941,15 @@ const handleCSVImport = async (event: Event) => {
         <button @click="handleCreateRound" class="btn btn-primary" style="padding: 0.5rem 1rem;">
           <Plus :size="16" />
           สร้างรอบใหม่
+        </button>
+        <button 
+          v-if="currentRound"
+          @click="handleResetRound" 
+          class="btn btn-danger" 
+          style="padding: 0.5rem 1.25rem; display: flex; align-items: center; gap: 0.25rem; height: 42px; font-weight: 600;"
+        >
+          <RefreshCw :size="16" />
+          เริ่มแข่งขันใหม่
         </button>
       </div>
     </div>
