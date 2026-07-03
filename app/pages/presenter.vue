@@ -524,13 +524,19 @@ const handleRoundChange = () => {
 
         <!-- 0. WELCOME / INTRO SCREEN -->
         <div v-if="currentRound.presenter_show_state === 'welcome'" class="presenter-card welcome-container">
+          <!-- Logo & Institution Info -->
+          <div class="welcome-org-section">
+            <img src="/scibru-logo.png" alt="SciBRU Logo" class="welcome-logo" />
+            <div class="welcome-org-name">คณะวิทยาศาสตร์ มหาวิทยาลัยราชภัฏบุรีรัมย์</div>
+          </div>
+
           <h1 class="welcome-title">การแข่งขันตอบปัญหาวิทยาศาสตร์</h1>
           <h2 class="welcome-subtitle">ระดับ {{ currentRound.name }}</h2>
           <div class="welcome-date" v-if="currentRound.round_date">
             วันที่ {{ currentRound.round_date }}
           </div>
           
-          <div style="margin-top: 3.5rem;">
+          <div style="margin-top: 3rem;">
             <button 
               v-if="!audioReady"
               @click="enableAudio" 
@@ -1233,9 +1239,38 @@ const handleRoundChange = () => {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 6rem 3rem;
+  padding: 5rem 3rem;
   min-height: 70vh;
   animation: fadeIn 0.5s ease-out;
+}
+
+.welcome-org-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  animation: fadeInDown 0.6s ease-out;
+}
+
+.welcome-logo {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 15px rgba(213, 0, 249, 0.2));
+  transition: transform 0.5s ease;
+}
+
+.welcome-logo:hover {
+  transform: scale(1.08) rotate(3deg);
+}
+
+.welcome-org-name {
+  font-family: var(--font-body);
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
 }
 
 .welcome-title {
@@ -1326,10 +1361,25 @@ const handleRoundChange = () => {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (max-height: 900px) or (min-aspect-ratio: 1.8/1) {
   .welcome-container {
     padding: 3rem 2rem;
     min-height: 60vh;
+  }
+  .welcome-logo {
+    width: 110px;
+    height: 110px;
+  }
+  .welcome-org-name {
+    font-size: 1.5rem;
+  }
+  .welcome-org-section {
+    margin-bottom: 1.5rem;
   }
   .welcome-title {
     font-size: 3.8rem;
@@ -1353,6 +1403,17 @@ const handleRoundChange = () => {
   .welcome-container {
     padding: 2rem 1.5rem;
     min-height: 50vh;
+  }
+  .welcome-logo {
+    width: 85px;
+    height: 85px;
+  }
+  .welcome-org-name {
+    font-size: 1.2rem;
+  }
+  .welcome-org-section {
+    margin-bottom: 1rem;
+    gap: 0.5rem;
   }
   .welcome-title {
     font-size: 3rem;
