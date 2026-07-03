@@ -342,23 +342,7 @@ const createDemoData = async () => {
             </div>
           </div>
 
-          <!-- Stage Presenter Portal (Public, no password) -->
-          <div @click="openPortal('presenter' as any)" class="glass-card portal-item" style="background: rgba(0, 229, 255, 0.03); display: flex; align-items: center; gap: 1rem; padding: 1.1rem; cursor: pointer;">
-            <Presentation :size="24" style="color: var(--color-cyan);" />
-            <div style="flex: 1;">
-              <h3 style="font-size: 1.15rem; color: var(--text-primary);">หน้าจอเวที LED (Stage Presentation)</h3>
-              <p style="font-size: 0.85rem; color: var(--text-secondary);">เปิดแสดงโจทย์คำถาม ตัวเลือก เฉลย และจับเวลาบนจอเวทีหลัก (ไม่ต้องระบุรหัสผ่าน)</p>
-            </div>
-          </div>
 
-          <!-- Stage Admin Controller Portal (Admin Password) -->
-          <div @click="openPortal('presenter-admin' as any)" class="glass-card portal-item" style="display: flex; align-items: center; gap: 1rem; padding: 1.1rem; cursor: pointer;">
-            <Sliders :size="24" style="color: var(--color-cyan);" />
-            <div style="flex: 1;">
-              <h3 style="font-size: 1.15rem; color: var(--text-primary);">แผงควบคุมหน้าจอเวที (Stage Admin Panel)</h3>
-              <p style="font-size: 0.85rem; color: var(--text-secondary);">ปุ่มควบคุมการจับเวลา เฉลยข้อคำถาม และเปลี่ยนสถานะหน้าจอ LED ใหญ่ (ใช้รหัสผ่านแอดมิน)</p>
-            </div>
-          </div>
 
           <!-- MC Portal (Staff/Admin Password) -->
           <div @click="openPortal('mc')" class="glass-card portal-item" style="display: flex; align-items: center; gap: 1rem; padding: 1.1rem; cursor: pointer;">
