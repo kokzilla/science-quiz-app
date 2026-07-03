@@ -263,7 +263,7 @@ begin
     elsif p_action = 'reset' then
         -- Delete all answers for teams in this round
         delete from answers 
-        where team_id in (select id from teams where round_id = p_round_id);
+        where team_id in (select teams.id from teams where teams.round_id = p_round_id);
         
         -- Reset round settings
         update rounds 
@@ -273,7 +273,7 @@ begin
             presenter_active_question = 1,
             presenter_show_state = 'question',
             presenter_timer_started_at = null
-        where id = p_round_id;
+        where rounds.id = p_round_id;
         
         return query select p_round_id;
     elsif p_action = 'delete' then
