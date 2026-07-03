@@ -11,6 +11,7 @@ create table if not exists rounds (
     id uuid primary key default uuid_generate_v4(),
     name text not null,
     date date not null default current_date,
+    round_date text,
     status text not null default 'pending', -- pending, active, completed
     revealed_question_number integer not null default 0, -- TV screen calculates answers <= this question
     created_at timestamp with time zone default timezone('utc'::text, now()) not null
@@ -242,8 +243,8 @@ begin
 
     if p_action = 'create' then
         new_id := uuid_generate_v4();
-        insert into rounds (id, name, status, revealed_question_number)
-        values (new_id, p_round_name, p_status, p_reveal_q);
+        insert into rounds (id, name, status, revealed_question_number, round_date, presenter_active_question, presenter_show_state)
+        values (new_id, p_round_name, p_status, p_reveal_q, to_char(current_date, 'DD/MM/YYYY'), 1, 'welcome');
         
         -- Auto-insert 20 questions for this round
         insert into questions (round_id, question_number, correct_answer)
@@ -260,6 +261,9 @@ begin
     elsif p_action = 'update_name' then
         update rounds set name = p_round_name where id = p_round_id;
         return query select p_round_id;
+    elsif p_action = 'update_details' then
+        update rounds set name = p_round_name, round_date = p_status where id = p_round_id;
+        return query select p_round_id;
     elsif p_action = 'reset' then
         -- Delete all answers for teams in this round
         delete from answers 
@@ -271,7 +275,7 @@ begin
             revealed_question_number = 0,
             status = 'active',
             presenter_active_question = 1,
-            presenter_show_state = 'question',
+            presenter_show_state = 'welcome',
             presenter_timer_started_at = null
         where rounds.id = p_round_id;
         
@@ -556,6 +560,10 @@ $$;
 -- 6. Add choices_layout column to questions table
 alter table questions 
 add column if not exists choices_layout text not null default '2_col';
+
+-- 7. Add round_date column to rounds table
+alter table rounds 
+add column if not exists round_date text;
 
 -- Notify schema reload
 notify pgrst, 'reload schema';

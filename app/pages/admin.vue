@@ -525,34 +525,40 @@ const handleDeleteRound = async () => {
   }
 }
 
-const handleEditRoundName = async () => {
+const handleEditRoundDetails = async () => {
   if (!supabase.value || !selectedRoundId.value || !currentRound.value) return
   if (!adminPasskey.value) {
     alert('กรุณากรอกรหัสผ่านแอดมินก่อนดำเนินการ')
     return
   }
+
   const newName = prompt('แก้ไขชื่อรอบการแข่งขัน:', currentRound.value.name)
   if (newName === null) return
-  const trimmed = newName.trim()
-  if (!trimmed) {
+  const trimmedName = newName.trim()
+  if (!trimmedName) {
     alert('ชื่อรอบการแข่งขันต้องไม่เป็นค่าว่าง')
     return
   }
 
+  const newDate = prompt('แก้ไขวันที่แข่งขัน (เช่น 3 กรกฎาคม 2569):', currentRound.value.round_date || '')
+  if (newDate === null) return
+  const trimmedDate = newDate.trim()
+
   const { error } = await supabase.value.rpc('manage_round_secure', {
-    p_action: 'update_name',
-    p_round_name: trimmed,
-    p_status: '',
+    p_action: 'update_details',
+    p_round_name: trimmedName,
+    p_status: trimmedDate,
     p_reveal_q: 0,
     p_round_id: selectedRoundId.value,
     p_admin_passkey: adminPasskey.value
   })
 
   if (!error) {
-    currentRound.value.name = trimmed
+    currentRound.value.name = trimmedName
+    currentRound.value.round_date = trimmedDate
     await fetchRounds()
   } else {
-    alert(`เกิดข้อผิดพลาดในการแก้ไขชื่อรอบ: ${error.message}`)
+    alert(`เกิดข้อผิดพลาดในการแก้ไขข้อมูลรอบ: ${error.message}`)
   }
 }
 
@@ -961,17 +967,21 @@ const handleCSVImport = async (event: Event) => {
           <h1 style="font-size: 2rem; margin-bottom: 0.25rem; color: var(--text-primary); display: inline-flex; align-items: center; gap: 0.75rem;">
             <span>{{ currentRound.name }}</span>
             <button 
-              @click="handleEditRoundName" 
+              @click="handleEditRoundDetails" 
               class="btn btn-secondary" 
               style="padding: 0.25rem 0.6rem; font-size: 0.75rem; height: 28px; display: inline-flex; align-items: center; justify-content: center; font-weight: normal;"
             >
-              แก้ไขชื่อรอบ
+              แก้ไขข้อมูลรอบ
             </button>
           </h1>
-          <p style="color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem;">
+          <p style="color: var(--text-secondary); display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; font-size: 0.95rem; margin-top: 0.25rem;">
+            <span>วันที่แข่งขัน: </span>
+            <span style="color: var(--color-cyan); font-weight: 700;">{{ currentRound.round_date || 'ไม่ได้กำหนด' }}</span>
+            <span style="color: var(--text-muted);">|</span>
             <span>สถานะ: </span>
             <span class="status-pill" :class="currentRound.status">{{ currentRound.status }}</span>
-            <span>| เผยแพร่ถึงข้อที่: </span>
+            <span style="color: var(--text-muted);">|</span>
+            <span>เผยแพร่ถึงข้อที่: </span>
             <span class="status-pill completed" style="background: rgba(0, 229, 255, 0.15)">{{ currentRound.revealed_question_number }}</span>
           </p>
         </div>

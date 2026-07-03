@@ -447,7 +447,7 @@ const handleRoundChange = () => {
   <div class="presenter-view">
     
     <!-- Audio unlock overlay gate -->
-    <div v-if="!audioReady" class="audio-unlock-overlay no-print">
+    <div v-if="!audioReady && currentRound?.presenter_show_state !== 'welcome'" class="audio-unlock-overlay no-print">
       <div class="glass-card" style="max-width: 500px; text-align: center; padding: 3rem; border-color: var(--color-cyan);">
         <Volume2 :size="64" class="text-cyan" style="margin-bottom: 1.5rem;" />
         <h2 style="font-size: 1.8rem; margin-bottom: 1rem; color: #fff;">เปิดการใช้งานระบบเสียงเวที</h2>
@@ -522,8 +522,32 @@ const handleRoundChange = () => {
           </div>
         </div>
 
+        <!-- 0. WELCOME / INTRO SCREEN -->
+        <div v-if="currentRound.presenter_show_state === 'welcome'" class="presenter-card welcome-container">
+          <h1 class="welcome-title">การแข่งขันตอบปัญหาวิทยาศาสตร์</h1>
+          <h2 class="welcome-subtitle">ระดับ {{ currentRound.name }}</h2>
+          <div class="welcome-date" v-if="currentRound.round_date">
+            วันที่ {{ currentRound.round_date }}
+          </div>
+          
+          <div style="margin-top: 3.5rem;">
+            <button 
+              v-if="!audioReady"
+              @click="enableAudio" 
+              class="btn btn-primary welcome-start-btn"
+            >
+              <Play :size="24" />
+              <span>เริ่มแข่งขัน</span>
+            </button>
+            <div v-else class="welcome-waiting-indicator">
+              <div class="pulse-ring"></div>
+              <span>ระบบพร้อมใช้งาน • รอกรรมการเริ่มข้อที่ 1</span>
+            </div>
+          </div>
+        </div>
+
         <!-- 1. CORRECT TEAMS GRID VIEW -->
-        <div v-if="currentRound.presenter_show_state === 'correct_teams'" class="presenter-card correct-teams-container">
+        <div v-else-if="currentRound.presenter_show_state === 'correct_teams'" class="presenter-card correct-teams-container">
           <h1 class="presenter-header-text" style="color: var(--color-gold); display: flex; align-items: center; justify-content: center; gap: 1rem;">
             <Award :size="48" style="color: var(--color-gold);" />
             <span>รายชื่อทีมที่ตอบถูกต้องในข้อที่ {{ currentRound.presenter_active_question }} จำนวน {{ correctTeams.length }} ทีม</span>
@@ -1200,5 +1224,148 @@ const handleRoundChange = () => {
 }
 .intro-fade-enter-from, .intro-fade-leave-to {
   opacity: 0;
+}
+
+/* Welcome/Intro Screen Styles */
+.welcome-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 6rem 3rem;
+  min-height: 70vh;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.welcome-title {
+  font-family: var(--font-title);
+  font-size: 4.8rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 20px rgba(0, 229, 255, 0.15));
+  margin-bottom: 1.5rem;
+}
+
+.welcome-subtitle {
+  font-family: var(--font-body);
+  font-size: 3.4rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 1.5rem;
+}
+
+.welcome-date {
+  font-family: var(--font-body);
+  font-size: 2.2rem;
+  color: var(--text-secondary);
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 0.75rem 2.5rem;
+  border-radius: 40px;
+  display: inline-block;
+  margin-top: 1rem;
+}
+
+.welcome-start-btn {
+  font-size: 1.8rem;
+  padding: 1.2rem 3.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 auto;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-neon-cyan);
+  animation: pulse-btn 1.5s infinite;
+}
+
+.welcome-waiting-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  font-size: 1.6rem;
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.pulse-ring {
+  width: 14px;
+  height: 14px;
+  background: var(--color-success);
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7);
+  animation: pulse-ring-anim 1.5s infinite;
+}
+
+@keyframes pulse-btn {
+  0% { transform: scale(1); box-shadow: var(--shadow-neon-cyan); }
+  50% { transform: scale(1.05); box-shadow: 0 0 30px rgba(0, 229, 255, 0.6); }
+  100% { transform: scale(1); box-shadow: var(--shadow-neon-cyan); }
+}
+
+@keyframes pulse-ring-anim {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(0, 230, 118, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(0, 230, 118, 0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-height: 900px) or (min-aspect-ratio: 1.8/1) {
+  .welcome-container {
+    padding: 3rem 2rem;
+    min-height: 60vh;
+  }
+  .welcome-title {
+    font-size: 3.8rem;
+  }
+  .welcome-subtitle {
+    font-size: 2.8rem;
+  }
+  .welcome-date {
+    font-size: 1.8rem;
+  }
+  .welcome-start-btn {
+    font-size: 1.5rem;
+    padding: 1rem 2.8rem;
+  }
+  .welcome-waiting-indicator {
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-height: 720px) {
+  .welcome-container {
+    padding: 2rem 1.5rem;
+    min-height: 50vh;
+  }
+  .welcome-title {
+    font-size: 3rem;
+  }
+  .welcome-subtitle {
+    font-size: 2.2rem;
+  }
+  .welcome-date {
+    font-size: 1.5rem;
+  }
+  .welcome-start-btn {
+    font-size: 1.3rem;
+    padding: 0.8rem 2.2rem;
+  }
 }
 </style>
