@@ -296,6 +296,56 @@ const handleExit = () => {
         <!-- LEFT COLUMN: ACTIVE COMMAND CONTROLLER -->
         <div style="display: flex; flex-direction: column; gap: 1.5rem;">
           
+          <!-- Pre-competition sequence controller card -->
+          <div class="glass-card controller-card" style="border-color: rgba(213, 0, 249, 0.25);">
+            <h2 class="section-title" style="color: var(--color-purple); display: flex; align-items: center; gap: 0.5rem; border-bottom-color: rgba(213, 0, 249, 0.15);">
+              <Sliders :size="20" style="color: var(--color-purple);" />
+              <span>ขั้นตอนก่อนเริ่มการแข่งขัน</span>
+            </h2>
+            
+            <div class="control-actions-stack" style="margin-top: 1rem;">
+              <button 
+                @click="updatePresenterState(1, 'welcome')"
+                class="btn control-btn"
+                :class="currentRound.presenter_show_state === 'welcome' ? 'btn-primary active-btn' : 'btn-secondary'"
+              >
+                <span>1. หน้าต้อนรับ (Welcome State)</span>
+              </button>
+              
+              <button 
+                @click="updatePresenterState(1, 'rules')"
+                class="btn control-btn"
+                :class="currentRound.presenter_show_state === 'rules' ? 'btn-primary active-btn' : 'btn-secondary'"
+              >
+                <span>2. กติกาและเวลาตอบคำถาม</span>
+              </button>
+              
+              <button 
+                @click="updatePresenterState(1, 'sample_question')"
+                class="btn control-btn"
+                :class="currentRound.presenter_show_state === 'sample_question' ? 'btn-primary active-btn' : 'btn-secondary'"
+              >
+                <span>3. ข้อสอบตัวอย่าง</span>
+              </button>
+              
+              <button 
+                @click="updatePresenterState(1, 'sample_answer')"
+                class="btn control-btn"
+                :class="currentRound.presenter_show_state === 'sample_answer' ? 'btn-primary active-btn' : 'btn-secondary'"
+              >
+                <span>4. เฉลยข้อสอบตัวอย่าง</span>
+              </button>
+              
+              <button 
+                @click="updatePresenterState(1, 'get_ready')"
+                class="btn control-btn"
+                :class="currentRound.presenter_show_state === 'get_ready' ? 'btn-primary active-btn' : 'btn-secondary'"
+              >
+                <span>5. เตรียมพร้อมแข่งขัน (Get Ready)</span>
+              </button>
+            </div>
+          </div>
+
           <!-- State controller card -->
           <div class="glass-card controller-card">
             <h2 class="section-title">ปุ่มควบคุมจอเวที</h2>

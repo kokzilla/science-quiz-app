@@ -564,6 +564,81 @@ const handlePageClick = () => {
           </div>
         </div>
 
+        <!-- A. RULES SCREEN -->
+        <div v-else-if="currentRound.presenter_show_state === 'rules'" class="presenter-card rules-container">
+          <h1 class="rules-title">กติกาการแข่งขัน</h1>
+          <div class="rules-content-card">
+            <div class="rule-row">
+              <span class="rule-icon">📝</span>
+              <span class="rule-text">จำนวนคำถามทั้งสิ้น <strong class="highlight-yellow">20 ข้อ</strong></span>
+            </div>
+            <div class="rule-row">
+              <span class="rule-icon">⏱️</span>
+              <span class="rule-text">กำหนดเวลาตอบคำถามข้อละ <strong class="highlight-cyan">30 วินาที</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- B. SAMPLE QUESTION SCREEN -->
+        <div v-else-if="currentRound.presenter_show_state === 'sample_question'" class="presenter-card sample-q-container">
+          <div class="sample-badge">ข้อสอบตัวอย่าง (Sample Question)</div>
+          <h1 class="sample-q-text">ตัวอย่าง: ดาวเคราะห์ดวงใดอยู่ใกล้ดวงอาทิตย์มากที่สุด?</h1>
+          
+          <div class="sample-choices-grid">
+            <div class="sample-choice-card">
+              <span class="sample-choice-letter">ก</span>
+              <span class="sample-choice-text">ดาวศุกร์ (Venus)</span>
+            </div>
+            <div class="sample-choice-card">
+              <span class="sample-choice-letter">ข</span>
+              <span class="sample-choice-text">ดาวพุธ (Mercury)</span>
+            </div>
+            <div class="sample-choice-card">
+              <span class="sample-choice-letter">ค</span>
+              <span class="sample-choice-text">ดาวอังคาร (Mars)</span>
+            </div>
+            <div class="sample-choice-card">
+              <span class="sample-choice-letter">ง</span>
+              <span class="sample-choice-text">โลก (Earth)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- C. SAMPLE ANSWER SCREEN -->
+        <div v-else-if="currentRound.presenter_show_state === 'sample_answer'" class="presenter-card sample-q-container">
+          <div class="sample-badge">ข้อสอบตัวอย่าง (เฉลย)</div>
+          <h1 class="sample-q-text">ตัวอย่าง: ดาวเคราะห์ดวงใดอยู่ใกล้ดวงอาทิตย์มากที่สุด?</h1>
+          
+          <div class="sample-choices-grid">
+            <div class="sample-choice-card incorrect">
+              <span class="sample-choice-letter">ก</span>
+              <span class="sample-choice-text">ดาวศุกร์ (Venus)</span>
+            </div>
+            <div class="sample-choice-card correct">
+              <span class="sample-choice-letter">ข</span>
+              <span class="sample-choice-text">ดาวพุธ (Mercury)</span>
+            </div>
+            <div class="sample-choice-card incorrect">
+              <span class="sample-choice-letter">ค</span>
+              <span class="sample-choice-text">ดาวอังคาร (Mars)</span>
+            </div>
+            <div class="sample-choice-card incorrect">
+              <span class="sample-choice-letter">ง</span>
+              <span class="sample-choice-text">โลก (Earth)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- D. GET READY SCREEN -->
+        <div v-else-if="currentRound.presenter_show_state === 'get_ready'" class="presenter-card get-ready-container">
+          <h1 class="get-ready-title">เตรียมพร้อมแข่งขัน</h1>
+          <p class="get-ready-subtitle">โปรดเตรียมเครื่องเขียนและกระดาษคำตอบให้พร้อม</p>
+          <div class="get-ready-waiting-box">
+            <div class="pulse-ring"></div>
+            <span>รอการเปิดคำถามข้อที่ 1 จากคณะกรรมการ...</span>
+          </div>
+        </div>
+
         <!-- 1. CORRECT TEAMS GRID VIEW -->
         <div v-else-if="currentRound.presenter_show_state === 'correct_teams'" class="presenter-card correct-teams-container">
           <h1 class="presenter-header-text" style="color: var(--color-gold); display: flex; align-items: center; justify-content: center; gap: 1rem;">
@@ -1382,6 +1457,325 @@ const handlePageClick = () => {
   }
   .welcome-date {
     font-size: 1.6rem;
+  }
+}
+/* Rules Screen Styles */
+.rules-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6rem 3rem;
+  min-height: 70vh;
+  animation: fadeIn 0.5s ease-out;
+  text-align: center;
+}
+
+.rules-title {
+  font-family: var(--font-title);
+  font-size: 4.8rem;
+  font-weight: 800;
+  color: #fff;
+  margin-bottom: 3.5rem;
+  background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 15px rgba(0, 229, 255, 0.1));
+}
+
+.rules-content-card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  padding: 4rem 6rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+  max-width: 800px;
+  width: 100%;
+}
+
+.rule-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+}
+
+.rule-icon {
+  font-size: 3rem;
+}
+
+.rule-text {
+  font-size: 2.2rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.highlight-yellow {
+  color: var(--color-gold);
+  font-size: 2.6rem;
+  font-weight: 800;
+}
+
+.highlight-cyan {
+  color: var(--color-cyan);
+  font-size: 2.6rem;
+  font-weight: 800;
+}
+
+/* Sample Question Screen Styles */
+.sample-q-container {
+  padding: 4rem 3rem;
+  min-height: 70vh;
+  animation: fadeIn 0.5s ease-out;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.sample-badge {
+  background: rgba(213, 0, 249, 0.15);
+  border: 1px solid rgba(213, 0, 249, 0.3);
+  color: var(--color-purple);
+  padding: 0.5rem 1.5rem;
+  border-radius: 20px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  align-self: center;
+  margin-bottom: 2rem;
+  letter-spacing: 1px;
+}
+
+.sample-q-text {
+  font-size: 3rem;
+  font-weight: 700;
+  color: #fff;
+  text-align: center;
+  margin-bottom: 3.5rem;
+  line-height: 1.5;
+}
+
+.sample-choices-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.sample-choice-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--glass-border);
+  padding: 2rem;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  transition: transform 0.3s ease;
+}
+
+.sample-choice-letter {
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.sample-choice-text {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sample-choice-card.correct {
+  background: rgba(0, 230, 118, 0.08) !important;
+  border-color: var(--color-success) !important;
+  box-shadow: 0 0 20px rgba(0, 230, 118, 0.15);
+  transform: scale(1.03);
+}
+
+.sample-choice-card.correct .sample-choice-letter {
+  background: var(--color-success) !important;
+  color: #052e16 !important;
+}
+
+.sample-choice-card.incorrect {
+  opacity: 0.35;
+}
+
+/* Get Ready Screen Styles */
+.get-ready-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 6rem 3rem;
+  min-height: 70vh;
+  animation: fadeIn 0.5s ease-out;
+}
+
+.get-ready-title {
+  font-family: var(--font-title);
+  font-size: 4.8rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 20px rgba(0, 229, 255, 0.15));
+  margin-bottom: 1.5rem;
+}
+
+.get-ready-subtitle {
+  font-size: 2.2rem;
+  color: var(--text-secondary);
+  margin-bottom: 4rem;
+}
+
+.get-ready-waiting-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  font-size: 1.8rem;
+  color: var(--color-cyan);
+  font-weight: 600;
+  background: rgba(0, 229, 255, 0.04);
+  border: 1px solid rgba(0, 229, 255, 0.15);
+  padding: 1.5rem 3rem;
+  border-radius: 40px;
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.05);
+}
+
+/* Light theme tweaks for pre-competition */
+.light-theme .rules-title,
+.light-theme .get-ready-title {
+  filter: drop-shadow(0 0 10px rgba(0, 172, 193, 0.1));
+}
+
+.light-theme .rules-content-card {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(15, 23, 42, 0.06);
+}
+
+.light-theme .rule-text {
+  color: #0f172a;
+}
+
+.light-theme .sample-q-text {
+  color: #0f172a;
+}
+
+.light-theme .sample-choice-card {
+  background: rgba(15, 23, 42, 0.02);
+  border-color: rgba(15, 23, 42, 0.05);
+}
+
+.light-theme .sample-choice-letter {
+  background: #cbd5e1;
+  color: #0f172a;
+}
+
+.light-theme .sample-choice-text {
+  color: #0f172a;
+}
+
+.light-theme .get-ready-subtitle {
+  color: #475569;
+}
+
+.light-theme .get-ready-waiting-box {
+  background: rgba(0, 172, 193, 0.04);
+  border-color: rgba(0, 172, 193, 0.15);
+  color: var(--color-cyan);
+}
+
+@media (max-height: 900px) or (min-aspect-ratio: 1.8/1) {
+  .rules-container, .sample-q-container, .get-ready-container {
+    padding: 3rem 2rem;
+    min-height: 60vh;
+  }
+  .rules-title, .get-ready-title {
+    font-size: 3.8rem;
+    margin-bottom: 2rem;
+  }
+  .rules-content-card {
+    padding: 2.5rem 4rem;
+    gap: 1.5rem;
+  }
+  .rule-text {
+    font-size: 1.8rem;
+  }
+  .highlight-yellow, .highlight-cyan {
+    font-size: 2.1rem;
+  }
+  .sample-q-text {
+    font-size: 2.4rem;
+    margin-bottom: 2rem;
+  }
+  .sample-choice-card {
+    padding: 1.2rem;
+  }
+  .sample-choice-text {
+    font-size: 1.5rem;
+  }
+  .get-ready-subtitle {
+    font-size: 1.8rem;
+    margin-bottom: 2.5rem;
+  }
+  .get-ready-waiting-box {
+    font-size: 1.4rem;
+    padding: 1rem 2rem;
+  }
+}
+
+@media (max-height: 720px) {
+  .rules-container, .sample-q-container, .get-ready-container {
+    padding: 1.5rem 1rem;
+    min-height: 50vh;
+  }
+  .rules-title, .get-ready-title {
+    font-size: 2.8rem;
+    margin-bottom: 1.5rem;
+  }
+  .rules-content-card {
+    padding: 1.5rem 2rem;
+    gap: 1rem;
+  }
+  .rule-text {
+    font-size: 1.5rem;
+  }
+  .highlight-yellow, .highlight-cyan {
+    font-size: 1.7rem;
+  }
+  .sample-q-text {
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+  }
+  .sample-choice-card {
+    padding: 1rem;
+    gap: 1rem;
+  }
+  .sample-choice-letter {
+    width: 36px;
+    height: 36px;
+    font-size: 1.2rem;
+  }
+  .sample-choice-text {
+    font-size: 1.3rem;
+  }
+  .get-ready-subtitle {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
   }
 }
 </style>
