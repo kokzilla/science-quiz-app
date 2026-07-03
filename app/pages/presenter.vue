@@ -440,8 +440,8 @@ watch(ttsEnabled, (newVal) => {
 })
 
 watch(soundEnabled, (newVal) => {
-  if (!newVal && typeof window !== 'undefined' && ('speechSynthesis' in window)) {
-    window.speechSynthesis.cancel()
+  if (!newVal) {
+    stopSounds()
   }
 })
 
@@ -462,6 +462,10 @@ const stopSounds = () => {
   if (tickAudio) {
     tickAudio.pause()
     tickAudio.currentTime = 0;
+  }
+  if (alarmAudio) {
+    alarmAudio.pause()
+    alarmAudio.currentTime = 0;
   }
   if (typeof window !== 'undefined' && ('speechSynthesis' in window)) {
     window.speechSynthesis.cancel()

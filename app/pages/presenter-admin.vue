@@ -361,24 +361,22 @@ const handleExit = () => {
                   @click="toggleTts" 
                   class="btn" 
                   :class="ttsEnabled ? 'btn-primary' : 'btn-secondary'"
-                  style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; display: flex; align-items: center; gap: 0.25rem; margin: 0;"
+                  style="padding: 0.5rem; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; margin: 0;"
                   :title="ttsEnabled ? 'เสียงพูดอ่านโจทย์/ผู้ชนะ: เปิด' : 'เสียงพูดอ่านโจทย์/ผู้ชนะ: ปิด'"
                 >
-                  <Mic v-if="ttsEnabled" :size="14" />
-                  <MicOff v-else :size="14" />
-                  <span>เสียงพูด: {{ ttsEnabled ? 'เปิด' : 'ปิด' }}</span>
+                  <Mic v-if="ttsEnabled" :size="16" />
+                  <MicOff v-else :size="16" />
                 </button>
 
                 <button 
                   @click="toggleSound" 
                   class="btn" 
                   :class="soundEnabled ? 'btn-primary' : 'btn-secondary'"
-                  style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; display: flex; align-items: center; gap: 0.25rem; margin: 0;"
+                  style="padding: 0.5rem; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; margin: 0;"
                   :title="soundEnabled ? 'เสียงเตือนเวลานับถอยหลัง: เปิด' : 'เสียงเตือนเวลานับถอยหลัง: ปิด'"
                 >
-                  <Volume2 v-if="soundEnabled" :size="14" />
-                  <VolumeX v-else :size="14" />
-                  <span>เสียงนาฬิกา: {{ soundEnabled ? 'เปิด' : 'ปิด' }}</span>
+                  <Volume2 v-if="soundEnabled" :size="16" />
+                  <VolumeX v-else :size="16" />
                 </button>
               </div>
             </div>
