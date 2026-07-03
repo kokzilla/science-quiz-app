@@ -47,6 +47,8 @@ let answersChannel: any = null
 // Question Intro state
 const showQuestionIntro = ref(false)
 let introTimeout: any = null
+let speakTimeout: any = null
+let correctTeamsSpeakTimeout: any = null
 
 onMounted(async () => {
   selectedRoundId.value = route.query.round as string || ''
@@ -199,6 +201,9 @@ const getThaiMaleVoice = () => {
 const speakCorrectTeams = () => {
   if (!ttsEnabled.value || typeof window === 'undefined' || !('speechSynthesis' in window)) return
 
+  // Cancel any pending speech timeout
+  if (correctTeamsSpeakTimeout) clearTimeout(correctTeamsSpeakTimeout)
+
   // Cancel any ongoing speech
   window.speechSynthesis.cancel()
 
@@ -230,13 +235,17 @@ const speakCorrectTeams = () => {
   utterance.rate = 0.95 // Slightly slower for clear Thai pronunciation
 
   // Chrome Bug Workaround: Delay speaking slightly after cancel() to avoid thread hang
-  setTimeout(() => {
+  correctTeamsSpeakTimeout = setTimeout(() => {
     window.speechSynthesis.speak(utterance)
-  }, 100)
+    correctTeamsSpeakTimeout = null
+  }, 150)
 }
 
 const speakQuestionStart = (qNum: number) => {
   if (!ttsEnabled.value || typeof window === 'undefined' || !('speechSynthesis' in window)) return
+
+  // Cancel any pending speech timeout
+  if (speakTimeout) clearTimeout(speakTimeout)
 
   // Cancel any ongoing speech
   window.speechSynthesis.cancel()
@@ -256,9 +265,10 @@ const speakQuestionStart = (qNum: number) => {
   utterance.rate = 0.95 // Slightly slower for clear Thai pronunciation
 
   // Chrome Bug Workaround: Delay speaking slightly after cancel() to avoid thread hang
-  setTimeout(() => {
+  speakTimeout = setTimeout(() => {
     window.speechSynthesis.speak(utterance)
-  }, 100)
+    speakTimeout = null
+  }, 150)
 }
 
 const triggerQuestionStart = (qNum: number) => {
@@ -441,10 +451,27 @@ const handleRoundChange = () => {
   loadPresentationState()
   setupRealtimeSubscription()
 }
+
+const handlePageClick = () => {
+  if (!audioReady.value) {
+    enableAudio()
+  }
+}
 </script>
 
 <template>
-  <div class="presenter-view">
+  <div class="presenter-view" @click="handlePageClick">
+    
+    <!-- Floating audio unlock banner/hint at the bottom -->
+    <div 
+      v-if="!audioReady" 
+      class="no-print"
+      style="position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.85); border: 1px solid var(--glass-border-glow); padding: 0.8rem 2.2rem; border-radius: 30px; font-size: 1.25rem; color: var(--color-cyan); z-index: 1000; display: flex; align-items: center; gap: 0.75rem; cursor: pointer; box-shadow: 0 0 25px rgba(0, 229, 255, 0.25); animation: pulseHint 2s infinite;"
+      @click.stop="enableAudio"
+    >
+      <Volume2 :size="18" />
+      <span>คลิกพื้นที่ใดก็ได้บนหน้าจอนี้ เพื่อเชื่อมต่อระบบเสียงเวที (Click anywhere to unlock audio)</span>
+    </div>
     
     <!-- Audio unlock overlay gate -->
     <div v-if="!audioReady && currentRound?.presenter_show_state !== 'welcome'" class="audio-unlock-overlay no-print">
@@ -534,21 +561,6 @@ const handleRoundChange = () => {
           <h2 class="welcome-subtitle">ระดับ {{ currentRound.name }}</h2>
           <div class="welcome-date" v-if="currentRound.round_date">
             วันที่ {{ currentRound.round_date }}
-          </div>
-          
-          <div style="margin-top: 3rem;">
-            <button 
-              v-if="!audioReady"
-              @click="enableAudio" 
-              class="btn btn-primary welcome-start-btn"
-            >
-              <Play :size="24" />
-              <span>เริ่มแข่งขัน</span>
-            </button>
-            <div v-else class="welcome-waiting-indicator">
-              <div class="pulse-ring"></div>
-              <span>ระบบพร้อมใช้งาน • รอกรรมการเริ่มข้อที่ 1</span>
-            </div>
           </div>
         </div>
 
@@ -1275,7 +1287,7 @@ const handleRoundChange = () => {
 
 .welcome-title {
   font-family: var(--font-title);
-  font-size: 4.8rem;
+  font-size: 5.8rem;
   font-weight: 800;
   background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
   -webkit-background-clip: text;
@@ -1286,7 +1298,7 @@ const handleRoundChange = () => {
 
 .welcome-subtitle {
   font-family: var(--font-body);
-  font-size: 3.4rem;
+  font-size: 4.2rem;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 1.5rem;
@@ -1294,7 +1306,7 @@ const handleRoundChange = () => {
 
 .welcome-date {
   font-family: var(--font-body);
-  font-size: 2.2rem;
+  font-size: 2.6rem;
   color: var(--text-secondary);
   border: 1px solid var(--glass-border);
   background: var(--bg-primary);
@@ -1304,56 +1316,10 @@ const handleRoundChange = () => {
   margin-top: 1rem;
 }
 
-.welcome-start-btn {
-  font-size: 1.8rem;
-  padding: 1.2rem 3.5rem;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin: 0 auto;
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-neon-cyan);
-  animation: pulse-btn 1.5s infinite;
-}
-
-.welcome-waiting-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  font-size: 1.6rem;
-  color: var(--color-success);
-  font-weight: 600;
-}
-
-.pulse-ring {
-  width: 14px;
-  height: 14px;
-  background: var(--color-success);
-  border-radius: 50%;
-  box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7);
-  animation: pulse-ring-anim 1.5s infinite;
-}
-
-@keyframes pulse-btn {
-  0% { transform: scale(1); box-shadow: var(--shadow-neon-cyan); }
-  50% { transform: scale(1.05); box-shadow: 0 0 30px rgba(0, 229, 255, 0.6); }
-  100% { transform: scale(1); box-shadow: var(--shadow-neon-cyan); }
-}
-
-@keyframes pulse-ring-anim {
-  0% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(0, 230, 118, 0.7);
-  }
-  70% {
-    transform: scale(1);
-    box-shadow: 0 0 0 10px rgba(0, 230, 118, 0);
-  }
-  100% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(0, 230, 118, 0);
-  }
+@keyframes pulseHint {
+  0% { transform: translate(-50%, 0) scale(1); opacity: 0.9; }
+  50% { transform: translate(-50%, -4px) scale(1.02); opacity: 1; box-shadow: 0 0 30px rgba(0, 229, 255, 0.35); }
+  100% { transform: translate(-50%, 0) scale(1); opacity: 0.9; }
 }
 
 @keyframes fadeIn {
@@ -1382,20 +1348,13 @@ const handleRoundChange = () => {
     margin-bottom: 1.5rem;
   }
   .welcome-title {
-    font-size: 3.8rem;
+    font-size: 4.6rem;
   }
   .welcome-subtitle {
-    font-size: 2.8rem;
+    font-size: 3.4rem;
   }
   .welcome-date {
-    font-size: 1.8rem;
-  }
-  .welcome-start-btn {
-    font-size: 1.5rem;
-    padding: 1rem 2.8rem;
-  }
-  .welcome-waiting-indicator {
-    font-size: 1.3rem;
+    font-size: 2.0rem;
   }
 }
 
@@ -1416,17 +1375,13 @@ const handleRoundChange = () => {
     gap: 0.5rem;
   }
   .welcome-title {
-    font-size: 3rem;
+    font-size: 3.6rem;
   }
   .welcome-subtitle {
-    font-size: 2.2rem;
+    font-size: 2.6rem;
   }
   .welcome-date {
-    font-size: 1.5rem;
-  }
-  .welcome-start-btn {
-    font-size: 1.3rem;
-    padding: 0.8rem 2.2rem;
+    font-size: 1.6rem;
   }
 }
 </style>

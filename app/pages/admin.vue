@@ -997,17 +997,17 @@ const handleCSVImport = async (event: Event) => {
             {{ currentRound.status === 'active' ? 'สิ้นสุดการแข่ง' : 'เริ่มการแข่งขัน' }}
           </button>
           
-          <NuxtLink :to="`/scoreboard?round=${currentRound.id}`" target="_blank" class="btn btn-primary" style="background: rgba(255, 255, 255, 0.05); border-color: var(--glass-border);">
+          <NuxtLink :to="`/scoreboard?round=${currentRound.id}`" target="_blank" class="btn btn-secondary">
             <Tv :size="16" />
             เปิดจอ TV Scoreboard
           </NuxtLink>
 
-          <NuxtLink :to="`/presenter?round=${currentRound.id}`" target="_blank" class="btn btn-primary" style="background: rgba(0, 229, 255, 0.15); border-color: rgba(0, 229, 255, 0.3); color: var(--color-cyan);">
+          <NuxtLink :to="`/presenter?round=${currentRound.id}`" target="_blank" class="btn btn-secondary" style="border-color: var(--color-cyan); color: var(--color-cyan); background: rgba(0, 229, 255, 0.05);">
             <Presentation :size="16" />
             เปิดจอเวที LED
           </NuxtLink>
 
-          <NuxtLink :to="`/presenter-admin?round=${currentRound.id}`" target="_blank" class="btn btn-primary" style="background: linear-gradient(135deg, var(--color-cyan), var(--color-purple)); border: none; font-weight: 600; box-shadow: var(--shadow-neon-cyan);">
+          <NuxtLink :to="`/presenter-admin?round=${currentRound.id}`" target="_blank" class="btn btn-primary" style="background: linear-gradient(135deg, var(--color-cyan), var(--color-purple)); border: none; font-weight: 600; color: #fff !important; box-shadow: var(--shadow-neon-cyan);">
             <Sliders :size="16" />
             แผงควบคุมจอเวที
           </NuxtLink>
