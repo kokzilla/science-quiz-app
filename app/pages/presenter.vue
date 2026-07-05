@@ -1629,7 +1629,7 @@ const handlePageClick = () => {
   display: flex;
   flex-direction: column;
   gap: 3.5rem;
-  max-width: 900px;
+  max-width: 1050px;
   width: 100%;
 }
 
@@ -1654,12 +1654,14 @@ const handlePageClick = () => {
   color: var(--color-gold);
   font-size: 4.2rem;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .highlight-cyan {
   color: var(--color-cyan);
   font-size: 4.2rem;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 /* Sample Question Screen Styles */
