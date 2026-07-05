@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
-import { useRouter, useRoute } from '#imports'
+import { useRouter } from '#imports'
 import { useSupabase } from '~/composables/useSupabase'
+import { useAuth } from '~/composables/useAuth'
+import { useRoundSelector } from '~/composables/useRoundSelector'
+import { TOTAL_QUESTIONS } from '~/utils/constants'
 import { 
   Sliders, 
   Tv, 
@@ -10,7 +13,6 @@ import {
   Award,
   ChevronLeft, 
   ChevronRight,
-  Eye,
   RefreshCw,
   LogOut,
   AlertCircle,
@@ -18,20 +20,18 @@ import {
   VolumeX,
   Mic,
   MicOff,
-  CheckCircle,
-  Clock
+  Clock,
+  BookOpen
 } from 'lucide-vue-next'
+import type { Question, Answer, Team } from '~/types'
 
 const router = useRouter()
-const route = useRoute()
 const { supabase, isConfigured } = useSupabase()
+const { validateAdminOnly, getActivePasskey } = useAuth()
 
-const selectedRoundId = ref('')
-const roundsList = ref<any[]>([])
-const currentRound = ref<any>(null)
-const questions = ref<any[]>([])
-const answers = ref<any[]>([])
-const teams = ref<any[]>([])
+const questions = ref<Question[]>([])
+const answers = ref<Answer[]>([])
+const teams = ref<Team[]>([])
 
 const loading = ref(true)
 const passkeyValid = ref(false)
@@ -103,50 +103,80 @@ const toggleTts = () => {
   sendAudioSettings()
 }
 
+// Callback when selected round changes
+const onRoundChanged = async (roundId: string) => {
+  if (!supabase.value || !roundId) return
+  loading.value = true
+  isLoaded.value = false
+  
+  try {
+    const { data: qData } = await supabase.value
+      .from('questions')
+      .select('*')
+      .eq('round_id', roundId)
+      .order('question_number', { ascending: true })
+    questions.value = (qData || []) as Question[]
+
+    const { data: tData } = await supabase.value
+      .from('teams')
+      .select('*')
+      .eq('round_id', roundId)
+      .order('team_number', { ascending: true })
+    teams.value = (tData || []) as Team[]
+
+    await fetchAnswers()
+
+    // Clean up old subscriptions first
+    cleanupSubscriptions()
+
+    // Setup audio config broadcast channel
+    setupConfigChannel()
+
+    // Subscribe to realtime answer updates
+    answersChannel = supabase.value
+      .channel('presenter-admin-answers')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'answers' }, () => {
+        fetchAnswers()
+      })
+      .subscribe()
+
+    // Subscribe to round changes
+    roundChannel = supabase.value
+      .channel('presenter-admin-round')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rounds', filter: `id=eq.${roundId}` }, (payload: any) => {
+        currentRound.value = payload.new
+      })
+      .subscribe()
+      
+  } catch (err: any) {
+    errorMsg.value = `โหลดข้อมูลควบคุมล้มเหลว: ${err.message}`
+  } finally {
+    loading.value = false
+    setTimeout(() => {
+      isLoaded.value = true
+    }, 500)
+  }
+}
+
+// Using useRoundSelector composable
+const {
+  selectedRoundId,
+  roundsList,
+  currentRound,
+  handleRoundChange
+} = useRoundSelector(onRoundChanged)
+
 onUnmounted(() => {
   cleanupSubscriptions()
   if (autoTimerTimeout) clearTimeout(autoTimerTimeout)
 })
 
 onMounted(async () => {
-  if (typeof window !== 'undefined') {
-    adminPasskey.value = localStorage.getItem('admin_passkey') || ''
-    
-    if (!adminPasskey.value) {
-      router.push('/')
-      return
-    }
-    
-    // Verify passkey against DB
-    const validated = await verifyAuth(adminPasskey.value)
-    if (!validated) {
-      router.push('/')
-      return
-    }
-    passkeyValid.value = true
-  }
-
-  if (isConfigured.value) {
-    await fetchRounds()
-  }
-})
-
-const verifyAuth = async (key: string) => {
-  if (!supabase.value) return false
-  const { data } = await supabase.value.rpc('validate_passkey', { p_role: 'admin', p_passkey: key })
-  return !!data
-}
-
-watch(roundsList, () => {
-  if (roundsList.value.length > 0) {
-    const queryId = route.query.round as string
-    if (queryId && roundsList.value.some(r => r.id === queryId)) {
-      selectedRoundId.value = queryId
-    } else {
-      selectedRoundId.value = roundsList.value[0].id
-    }
-    handleRoundChange()
-  }
+  const isValid = await validateAdminOnly()
+  if (!isValid) return
+  
+  adminPasskey.value = getActivePasskey()
+  passkeyValid.value = true
 })
 
 watch(
@@ -165,88 +195,12 @@ watch(
     if (newState === 'question') {
       autoTimerTimeout = setTimeout(() => {
         if (currentRound.value?.presenter_show_state === 'question' && currentRound.value?.presenter_active_question === newQNum) {
-          updatePresenterState(newQNum, 'timer_start', true)
+          updatePresenterState(newQNum as number, 'timer_start', true)
         }
       }, 2500)
     }
   }
 )
-
-const fetchRounds = async () => {
-  if (!supabase.value) return
-  const { data } = await supabase.value
-    .from('rounds')
-    .select('*')
-    .order('created_at', { ascending: false })
-  if (data) {
-    roundsList.value = data
-  }
-}
-
-const handleRoundChange = async () => {
-  if (!supabase.value || !selectedRoundId.value) return
-  loading.value = true
-  isLoaded.value = false
-  
-  try {
-    // 1. Fetch round
-    const { data: rData } = await supabase.value
-      .from('rounds')
-      .select('*')
-      .eq('id', selectedRoundId.value)
-      .single()
-    currentRound.value = rData
-
-    // 2. Fetch questions
-    const { data: qData } = await supabase.value
-      .from('questions')
-      .select('*')
-      .eq('round_id', selectedRoundId.value)
-      .order('question_number', { ascending: true })
-    questions.value = qData || []
-
-    // 3. Fetch teams
-    const { data: tData } = await supabase.value
-      .from('teams')
-      .select('*')
-      .eq('round_id', selectedRoundId.value)
-      .order('team_number', { ascending: true })
-    teams.value = tData || []
-
-    // 4. Fetch answers
-    await fetchAnswers()
-
-    // Clean up old subscriptions first
-    cleanupSubscriptions()
-
-    // Setup audio config broadcast channel
-    setupConfigChannel()
-
-    // Subscribe to realtime answer updates (to show stats)
-    answersChannel = supabase.value
-      .channel('presenter-admin-answers')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'answers' }, () => {
-        fetchAnswers()
-      })
-      .subscribe()
-
-    // Subscribe to round changes (in case other admin updates state)
-    roundChannel = supabase.value
-      .channel('presenter-admin-round')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rounds', filter: `id=eq.${selectedRoundId.value}` }, (payload) => {
-        currentRound.value = payload.new
-      })
-      .subscribe()
-      
-  } catch (err: any) {
-    errorMsg.value = `โหลดข้อมูลควบคุมล้มเหลว: ${err.message}`
-  } finally {
-    loading.value = false
-    setTimeout(() => {
-      isLoaded.value = true
-    }, 500)
-  }
-}
 
 const fetchAnswers = async () => {
   if (!supabase.value || teams.value.length === 0) return
@@ -255,7 +209,7 @@ const fetchAnswers = async () => {
     .from('answers')
     .select('*')
     .in('team_id', teamIds)
-  answers.value = data || []
+  answers.value = (data || []) as Answer[]
 }
 
 // Update presenter active question or state via secure RPC
@@ -301,23 +255,23 @@ const handleExit = () => {
 </script>
 
 <template>
-  <div class="container" v-if="passkeyValid">
+  <div class="container dashboard-container" v-if="passkeyValid">
     
     <!-- Top Action Bar -->
-    <div class="glass-card" style="margin-bottom: 2rem; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;">
-      <div style="display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 280px;">
-        <label class="form-label" style="margin-bottom: 0; white-space: nowrap;">รอบการแข่งขัน:</label>
-        <select v-model="selectedRoundId" @change="handleRoundChange" class="form-input" style="max-width: 320px;">
+    <div class="glass-card action-bar">
+      <div class="selector-group">
+        <label class="form-label selector-label">รอบการแข่งขัน:</label>
+        <select v-model="selectedRoundId" @change="handleRoundChange" class="form-input selector-dropdown">
           <option v-for="r in roundsList" :key="r.id" :value="r.id">{{ r.name }}</option>
         </select>
       </div>
 
-      <div style="display: flex; gap: 0.5rem;">
-        <NuxtLink :to="`/presenter?round=${selectedRoundId}`" target="_blank" class="btn btn-secondary" style="display: flex; align-items: center; gap: 0.25rem;">
+      <div class="buttons-group">
+        <NuxtLink :to="`/presenter?round=${selectedRoundId}`" target="_blank" class="btn btn-secondary led-btn">
           <Tv :size="16" />
-          <span>เปิดหน้าจอ LED ใหญ่</span>
+          <span>เปิดจอ LED ใหญ่</span>
         </NuxtLink>
-        <button @click="handleExit" class="btn btn-secondary" style="display: flex; align-items: center; gap: 0.25rem;">
+        <button @click="handleExit" class="btn btn-secondary exit-btn">
           <LogOut :size="16" />
           <span>กลับหน้าแรก</span>
         </button>
@@ -325,266 +279,282 @@ const handleExit = () => {
     </div>
 
     <!-- Error/Loading states -->
-    <div v-if="loading" style="text-align: center; color: var(--text-secondary); padding: 5rem;">
-      <div class="loading-spin" style="width: 40px; height: 40px; border: 3px solid var(--color-cyan); border-top-color: transparent; border-radius: 50%; margin: 0 auto 1.5rem;"></div>
+    <div v-if="loading" class="loading-state">
+      <div class="loading-spin"></div>
       <p>กำลังเตรียมระบบควบคุมเวที...</p>
     </div>
 
-    <div v-else-if="errorMsg" class="glass-card" style="text-align: center; color: var(--color-error); padding: 4rem;">
-      <AlertCircle :size="48" style="margin-bottom: 1rem;" />
+    <div v-else-if="errorMsg" class="glass-card error-card">
+      <AlertCircle :size="48" class="error-icon" />
       <p>{{ errorMsg }}</p>
     </div>
 
     <template v-else-if="currentRound">
-      <div style="text-align: center; margin-bottom: 2rem;">
-        <h1 style="font-size: 2.2rem; background: linear-gradient(135deg, var(--color-cyan), var(--color-purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.25rem;">
-          แผงควบคุมหน้าจอเวที (Stage Admin Panel)
-        </h1>
-        <p style="color: var(--text-secondary); font-size: 1.05rem;">
-          {{ currentRound.name }} • สั่งเปลี่ยนภาพ เสียงนับถอยหลัง และเฉลยสดบนจอ LED หน้าห้องประชุม
-        </p>
-      </div>
-
-      <div class="presenter-admin-grid">
+      <!-- Main Dashboard Grid Layout (Single Widescreen Page) -->
+      <div class="presenter-admin-layout">
         
-        <!-- LEFT COLUMN: ACTIVE COMMAND CONTROLLER -->
-        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <!-- COLUMN 1: STAGE CONTROLS & SETUP -->
+        <div class="dashboard-col col-control">
           
-          <!-- State controller card -->
-          <div class="glass-card controller-card">
-            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border); padding-bottom: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;">
-              <h2 class="section-title" style="margin: 0; border: none; padding: 0;">ปุ่มควบคุมจอเวที</h2>
+          <!-- Card 1: Setup & Intro (ก่อนเริ่มแข่งขัน - ย่อเล็ก) -->
+          <div class="glass-card setup-card">
+            <h3 class="card-subtitle">1. เตรียมตัวก่อนแข่ง (กดครั้งเดียว)</h3>
+            <div class="setup-buttons-grid">
+              <button 
+                @click="updatePresenterState(1, 'welcome')" 
+                class="btn btn-secondary btn-setup" 
+                :class="{ active: currentRound.presenter_show_state === 'welcome' }"
+              >
+                1. หน้าปก
+              </button>
               
-              <!-- Audio Controls -->
-              <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <button 
+                @click="updatePresenterState(1, 'rules')" 
+                class="btn btn-secondary btn-setup" 
+                :class="{ active: currentRound.presenter_show_state === 'rules' }"
+              >
+                2. กติกา
+              </button>
+              
+              <button 
+                @click="updatePresenterState(1, 'sample_question')" 
+                class="btn btn-secondary btn-setup" 
+                :class="{ active: currentRound.presenter_show_state === 'sample_question' }"
+              >
+                3. ตัวอย่างโจทย์
+              </button>
+              
+              <button 
+                @click="updatePresenterState(1, 'sample_answer')" 
+                class="btn btn-secondary btn-setup" 
+                :class="{ active: currentRound.presenter_show_state === 'sample_answer' }"
+              >
+                4. เฉลยตัวอย่าง
+              </button>
+              
+              <button 
+                @click="updatePresenterState(1, 'get_ready')" 
+                class="btn btn-secondary btn-setup" 
+                :class="{ active: currentRound.presenter_show_state === 'get_ready' }"
+              >
+                5. เตรียมแข่ง
+              </button>
+            </div>
+          </div>
+          
+          <!-- Card 2: Question Controller (ควบคุมข้อสอบรายข้อ - ชัดเจนและใหญ่) -->
+          <div class="glass-card controller-card">
+            <div class="controller-header">
+              <h2 class="section-title">2. ควบคุมหน้าจอเวทีรายข้อ</h2>
+              
+              <!-- Audio Toggles -->
+              <div class="audio-controls-group">
                 <button 
                   @click="toggleTts" 
-                  class="btn" 
+                  class="btn toggle-audio-btn" 
                   :class="ttsEnabled ? 'btn-primary' : 'btn-secondary'"
-                  style="padding: 0.5rem; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; margin: 0;"
                   :title="ttsEnabled ? 'เสียงพูดอ่านโจทย์/ผู้ชนะ: เปิด' : 'เสียงพูดอ่านโจทย์/ผู้ชนะ: ปิด'"
                 >
-                  <Mic v-if="ttsEnabled" :size="16" />
-                  <MicOff v-else :size="16" />
+                  <Mic v-if="ttsEnabled" :size="14" />
+                  <MicOff v-else :size="14" />
                 </button>
 
                 <button 
                   @click="toggleSound" 
-                  class="btn" 
+                  class="btn toggle-audio-btn" 
                   :class="soundEnabled ? 'btn-primary' : 'btn-secondary'"
-                  style="padding: 0.5rem; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; margin: 0;"
                   :title="soundEnabled ? 'เสียงเตือนเวลานับถอยหลัง: เปิด' : 'เสียงเตือนเวลานับถอยหลัง: ปิด'"
                 >
-                  <Volume2 v-if="soundEnabled" :size="16" />
-                  <VolumeX v-else :size="16" />
+                  <Volume2 v-if="soundEnabled" :size="14" />
+                  <VolumeX v-else :size="14" />
                 </button>
               </div>
             </div>
             
             <div class="active-question-display">
-              <span class="active-q-label">ข้อคำถามที่เลือก</span>
-              <div class="active-q-controls">
+              <span class="display-label">ข้อคำถามปัจจุบัน</span>
+              <div class="display-controls">
                 <button 
                   @click="updatePresenterState(Math.max(1, currentRound.presenter_active_question - 1), 'question')" 
-                  class="btn btn-secondary q-nav-btn"
+                  class="btn btn-secondary nav-q-btn"
                   :disabled="currentRound.presenter_active_question === 1"
                 >
-                  <ChevronLeft :size="24" />
+                  <ChevronLeft :size="20" />
                 </button>
                 
-                <span class="active-q-number">ข้อที่ {{ currentRound.presenter_active_question }}</span>
+                <span class="active-q-num-text">ข้อที่ {{ currentRound.presenter_active_question }}</span>
                 
                 <button 
-                  @click="updatePresenterState(Math.min(20, currentRound.presenter_active_question + 1), 'question')" 
-                  class="btn btn-secondary q-nav-btn"
-                  :disabled="currentRound.presenter_active_question === 20"
+                  @click="updatePresenterState(Math.min(TOTAL_QUESTIONS, currentRound.presenter_active_question + 1), 'question')" 
+                  class="btn btn-secondary nav-q-btn"
+                  :disabled="currentRound.presenter_active_question === TOTAL_QUESTIONS"
                 >
-                  <ChevronRight :size="24" />
+                  <ChevronRight :size="20" />
                 </button>
               </div>
             </div>
 
-            <!-- Action buttons state -->
-            <div class="control-actions-stack">
-              <!-- Action 1: Show Question -->
+            <!-- Prominent Command Actions - Re-numbered 1 to 4 and vertically tight aligned -->
+            <div class="state-commands-list">
               <button 
                 @click="updatePresenterState(currentRound.presenter_active_question, 'question')"
-                class="btn control-btn"
-                :class="currentRound.presenter_show_state === 'question' ? 'btn-primary active-btn' : 'btn-secondary'"
+                class="btn cmd-state-btn btn-show-question"
+                :class="{ active: currentRound.presenter_show_state === 'question' }"
               >
-                <HelpCircle :size="20" />
-                <span>1. แสดงโจทย์คำถาม / สไลด์โจทย์</span>
+                <div class="btn-double-label">
+                  <strong>1. แสดงโจทย์บนจอเวที (Show Question)</strong>
+                  <small>* แสดงคำถาม + ตัวเลือก (นับถอยหลัง 30 วิ อัตโนมัติใน 2.5 วินาที)</small>
+                </div>
               </button>
 
-              <!-- Action 2: Start Timer -->
               <button 
                 @click="updatePresenterState(currentRound.presenter_active_question, 'timer_start', true)"
-                class="btn control-btn"
-                :class="currentRound.presenter_show_state === 'timer_start' ? 'btn-primary active-btn-timer' : 'btn-secondary'"
+                class="btn cmd-state-btn btn-start-timer"
+                :class="{ active: currentRound.presenter_show_state === 'timer_start' }"
               >
-                <Clock :size="20" />
-                <span>2. เริ่มจับเวลา 30 วินาที (เริ่มอัตโนมัติหลังเปิดโจทย์ 2.5 วิ)</span>
+                <div class="btn-icon-label">
+                  <Clock :size="18" />
+                  <span>2. ปล่อยเวลาถอยหลังทันที (Force Timer)</span>
+                </div>
               </button>
 
-              <!-- Action 3: Reveal Answer -->
               <button 
                 @click="updatePresenterState(currentRound.presenter_active_question, 'answer_revealed')"
-                class="btn control-btn"
-                :class="currentRound.presenter_show_state === 'answer_revealed' ? 'btn-primary active-btn' : 'btn-secondary'"
+                class="btn cmd-state-btn btn-reveal-answer"
+                :class="{ active: currentRound.presenter_show_state === 'answer_revealed' }"
               >
-                <Eye :size="20" />
-                <span>3. แสดงคำตอบที่ถูกต้อง</span>
+                <strong>3. เฉลยคำตอบถูกต้อง (Reveal Answer)</strong>
               </button>
 
-              <!-- Action 4: Reveal Correct Teams -->
               <button 
                 @click="updatePresenterState(currentRound.presenter_active_question, 'correct_teams')"
-                class="btn control-btn"
-                :class="currentRound.presenter_show_state === 'correct_teams' ? 'btn-primary active-btn' : 'btn-secondary'"
+                class="btn cmd-state-btn btn-reveal-teams"
+                :class="{ active: currentRound.presenter_show_state === 'correct_teams' }"
               >
-                <Award :size="20" />
-                <span>4. ประกาศรายชื่อทีมที่ตอบถูกต้อง</span>
+                <div class="btn-double-label">
+                  <strong>4. แสดงทีมตอบถูกบนจอเวที (Reveal Teams)</strong>
+                  <small>* อ่านประกาศหมายเลขทีมตอบถูกออฟไลน์</small>
+                </div>
               </button>
-            </div>
-          </div>
-
-          <!-- Live Status Info -->
-          <div class="glass-card">
-            <h3 style="margin-bottom: 1rem; color: #fff;">ข้อมูลประชากรคำตอบข้อนี้</h3>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; text-align: center;">
-              <div style="background: rgba(255,255,255,0.02); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--glass-border);">
-                <span style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">ส่งคำตอบแล้ว</span>
-                <span style="font-family: var(--font-title); font-size: 1.8rem; font-weight: 800; color: var(--color-cyan);">
-                  {{ activeQuestionAnswersCount }} / {{ teams.length }} ทีม
-                </span>
-              </div>
-              <div style="background: rgba(0, 230, 118, 0.04); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid rgba(0, 230, 118, 0.15);">
-                <span style="font-size: 0.85rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">ตอบถูกต้อง</span>
-                <span style="font-family: var(--font-title); font-size: 1.8rem; font-weight: 800; color: var(--color-success);">
-                  {{ activeQuestionCorrectCount }} ทีม
-                </span>
-              </div>
-            </div>
-
-            <!-- Question Metadata Review -->
-            <div v-if="activeQuestionData" style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--glass-border); font-size: 0.95rem;">
-              <p style="margin-bottom: 0.5rem;"><strong style="color: var(--color-cyan);">คำตอบข้อนี้:</strong> {{ activeQuestionData.correct_answer }}</p>
-              <p style="margin-bottom: 0.5rem;"><strong style="color: var(--color-cyan);">รูปแบบข้อสอบ:</strong> {{ activeQuestionData.is_image_only ? 'สไลด์รูปภาพเต็มจอ' : 'แบบฟอร์มข้อความพิมพ์' }}</p>
-              <p v-if="activeQuestionData.question_text" style="color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                <strong>โจทย์ย่อ:</strong> {{ activeQuestionData.question_text }}
-              </p>
             </div>
           </div>
 
         </div>
 
-        <!-- RIGHT COLUMN: Q1-Q20 SELECTOR GRID & STATS -->
-        <div class="glass-card" style="display: flex; flex-direction: column; gap: 1.25rem;">
+        <!-- COLUMN 2: DIRECT QUESTION SELECTOR (Moved here before preview) -->
+        <div class="dashboard-col col-selector">
           
-          <!-- Pre-competition sequence (horizontal & compact) -->
-          <div style="border: 1px solid rgba(213, 0, 249, 0.2); padding: 1rem; border-radius: var(--radius-md); background: rgba(213, 0, 249, 0.02); display: flex; flex-direction: column; gap: 0.75rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-              <h3 style="font-size: 1rem; font-weight: 700; color: var(--color-purple); display: flex; align-items: center; gap: 0.4rem; margin: 0;">
-                <Sliders :size="16" style="color: var(--color-purple);" />
-                <span>ขั้นตอนก่อนเริ่มการแข่งขัน (Pre-competition Sequence)</span>
-              </h3>
-              <span style="font-size: 0.75rem; color: var(--text-secondary);">คลิกเลือกหัวข้อเพื่อให้หน้าจอเวทีแสดงผลตามลำดับ</span>
+          <div class="glass-card questions-direct-selector">
+            <div class="selector-card-header">
+              <h2 class="section-title">3. เลือกข้อสอบโดยตรง</h2>
+              <button @click="onRoundChanged(selectedRoundId)" class="btn btn-secondary refresh-q-btn" title="รีเฟรชคลังข้อสอบ">
+                <RefreshCw :size="12" />
+              </button>
             </div>
             
-            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <div class="questions-buttons-grid">
               <button 
-                @click="updatePresenterState(1, 'welcome')"
-                class="btn control-btn"
-                :class="currentRound.presenter_show_state === 'welcome' ? 'btn-primary active-btn' : 'btn-secondary'"
-                style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; flex: 1; min-width: 130px; margin: 0;"
+                v-for="i in TOTAL_QUESTIONS" 
+                :key="i"
+                @click="updatePresenterState(i, 'question')"
+                class="btn grid-q-btn"
+                :class="{ 
+                  active: currentRound.presenter_active_question === i,
+                  configured: questions.some(q => q.question_number === i)
+                }"
               >
-                <span>1. หน้าต้อนรับ</span>
-              </button>
-              
-              <button 
-                @click="updatePresenterState(1, 'rules')"
-                class="btn control-btn"
-                :class="currentRound.presenter_show_state === 'rules' ? 'btn-primary active-btn' : 'btn-secondary'"
-                style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; flex: 1; min-width: 130px; margin: 0;"
-              >
-                <span>2. กติกาและเวลา</span>
-              </button>
-              
-              <button 
-                @click="updatePresenterState(1, 'sample_question')"
-                class="btn control-btn"
-                :class="currentRound.presenter_show_state === 'sample_question' ? 'btn-primary active-btn' : 'btn-secondary'"
-                style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; flex: 1; min-width: 120px; margin: 0;"
-              >
-                <span>3. ข้อสอบตัวอย่าง</span>
-              </button>
-              
-              <button 
-                @click="updatePresenterState(1, 'sample_answer')"
-                class="btn control-btn"
-                :class="currentRound.presenter_show_state === 'sample_answer' ? 'btn-primary active-btn' : 'btn-secondary'"
-                style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; flex: 1; min-width: 120px; margin: 0;"
-              >
-                <span>4. เฉลยตัวอย่าง</span>
-              </button>
-              
-              <button 
-                @click="updatePresenterState(1, 'get_ready')"
-                class="btn control-btn"
-                :class="currentRound.presenter_show_state === 'get_ready' ? 'btn-primary active-btn' : 'btn-secondary'"
-                style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; flex: 1; min-width: 130px; margin: 0;"
-              >
-                <span>5. เตรียมพร้อมแข่ง</span>
+                <div class="q-tile-content">
+                  <span class="q-tile-number">Q{{ i }}</span>
+                  <span class="q-tile-badge">
+                    {{ questions.find(q => q.question_number === i)?.is_image_only ? 'สไลด์' : questions.find(q => q.question_number === i) ? 'TEXT' : 'ว่าง' }}
+                  </span>
+                  <span class="q-tile-ans" v-if="questions.some(q => q.question_number === i)">
+                    ({{ questions.find(q => q.question_number === i)?.correct_answer }})
+                  </span>
+                </div>
               </button>
             </div>
           </div>
 
-          <h2 class="section-title" style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; border-top: 1px solid var(--glass-border); padding-top: 1rem;">
-            <span>คลังคำถามของรอบการแข่งนี้</span>
-            <button @click="handleRoundChange" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem; height: 32px; gap: 0.25rem;">
-              <RefreshCw :size="12" />
-              <span>รีเฟรช</span>
-            </button>
-          </h2>
+        </div>
 
-          <div class="questions-admin-grid">
-            <div 
-              v-for="i in 20" 
-              :key="i"
-              class="q-status-tile"
-              :class="{ 
-                'active-tile': currentRound.presenter_active_question === i,
-                'configured-tile': questions.some(q => q.question_number === i)
-              }"
-              @click="updatePresenterState(i, 'question')"
-            >
-              <div class="tile-number">Q{{ i }}</div>
-              
-              <!-- Indicator of config -->
-              <div class="tile-indicators">
-                <span 
-                  v-if="questions.find(q => q.question_number === i)?.is_image_only"
-                  class="badge-slide"
-                >
-                  SLIDE
+        <!-- COLUMN 3: LIVE PREVIEW & STATS (Moved here as the last column) -->
+        <div class="dashboard-col col-preview">
+          
+          <!-- Card 1: Live Question preview -->
+          <div class="glass-card monitor-card">
+            <h2 class="section-title">4. มอนิเตอร์โจทย์ข้อปัจจุบัน</h2>
+            
+            <div v-if="activeQuestionData" class="monitor-details">
+              <div class="preview-header">
+                <span class="preview-q-badge">
+                  คำถามข้อที่ {{ activeQuestionData.question_number }}
                 </span>
-                <span 
-                  v-else-if="questions.some(q => q.question_number === i)"
-                  class="badge-text"
-                >
-                  TEXT
-                </span>
-                <span v-else class="badge-empty">
-                  ว่าง
+                <span class="preview-mode-badge" :class="activeQuestionData.is_image_only ? 'bg-purple' : 'bg-cyan'">
+                  {{ activeQuestionData.is_image_only ? 'SLIDE' : 'TEXT' }}
                 </span>
               </div>
 
-              <!-- Answer key -->
-              <div v-if="questions.find(q => q.question_number === i)" class="tile-key">
-                เฉลย: <strong style="color: var(--color-gold);">{{ questions.find(q => q.question_number === i)?.correct_answer }}</strong>
+              <!-- Question text -->
+              <p class="preview-question-text">
+                {{ activeQuestionData.question_text || '(ไม่มีโจทย์ข้อความ - โหมดภาพสไลด์)' }}
+              </p>
+
+              <!-- Image previews in single row to save space -->
+              <div class="previews-row" v-if="activeQuestionData.question_image_url || activeQuestionData.answer_image_url">
+                <div v-if="activeQuestionData.question_image_url" class="image-preview-box">
+                  <span class="image-lbl">ภาพโจทย์:</span>
+                  <img :src="activeQuestionData.question_image_url" class="preview-image" alt="Question" />
+                </div>
+                <div v-if="activeQuestionData.answer_image_url" class="image-preview-box">
+                  <span class="image-lbl">ภาพเฉลย:</span>
+                  <img :src="activeQuestionData.answer_image_url" class="preview-image" alt="Answer" />
+                </div>
+              </div>
+
+              <!-- Compact Choices list with Correct Choice highlighted -->
+              <div v-if="!activeQuestionData.is_image_only" class="compact-choices-list">
+                <div class="compact-choice-item" :class="{ correct: activeQuestionData.correct_answer === 'ก' }">
+                  <span class="choice-tag">ก</span> <span class="choice-lbl">{{ activeQuestionData.choice_a }}</span>
+                </div>
+                <div class="compact-choice-item" :class="{ correct: activeQuestionData.correct_answer === 'ข' }">
+                  <span class="choice-tag">ข</span> <span class="choice-lbl">{{ activeQuestionData.choice_b }}</span>
+                </div>
+                <div class="compact-choice-item" :class="{ correct: activeQuestionData.correct_answer === 'ค' }">
+                  <span class="choice-tag">ค</span> <span class="choice-lbl">{{ activeQuestionData.choice_c }}</span>
+                </div>
+                <div class="compact-choice-item" :class="{ correct: activeQuestionData.correct_answer === 'ง' }">
+                  <span class="choice-tag">ง</span> <span class="choice-lbl">{{ activeQuestionData.choice_d }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div v-else class="empty-monitor">
+              <HelpCircle :size="24" class="empty-icon" />
+              <p>ไม่มีข้อมูลโจทย์ในระบบสำหรับข้อนี้</p>
+            </div>
+          </div>
+
+          <!-- Card 2: Stats Summary -->
+          <div class="glass-card stats-summary-card">
+            <h2 class="section-title">5. สถิติเรียลไทม์ (ข้อนี้)</h2>
+            <div class="stats-boxes-grid">
+              <div class="stat-box-container answers-received">
+                <span class="stat-box-lbl">ส่งคำตอบแล้ว</span>
+                <span class="stat-box-val">
+                  {{ activeQuestionAnswersCount }} / {{ teams.length }} ทีม
+                </span>
+              </div>
+              
+              <div class="stat-box-container correct-answers">
+                <span class="stat-box-lbl">ทีมที่ตอบถูกต้อง</span>
+                <span class="stat-box-val text-success">
+                  {{ activeQuestionCorrectCount }} ทีม
+                </span>
               </div>
             </div>
           </div>
+
         </div>
 
       </div>
@@ -593,59 +563,209 @@ const handleExit = () => {
 </template>
 
 <style scoped>
-.presenter-admin-grid {
-  display: grid;
-  grid-template-columns: 450px 1fr;
-  gap: 2rem;
+/* dashboard layout to fit single page */
+.dashboard-container {
+  max-width: 1600px;
+  height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 1rem 1.5rem;
 }
 
-@media (max-width: 1024px) {
-  .presenter-admin-grid {
-    grid-template-columns: 1fr;
-  }
+.action-bar {
+  margin-bottom: 1rem; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  padding: 0.5rem 1.25rem;
+  flex-shrink: 0;
+}
+
+.selector-group {
+  display: flex; 
+  align-items: center; 
+  gap: 0.75rem;
+}
+
+.selector-label {
+  margin-bottom: 0; 
+  white-space: nowrap;
+  font-size: 0.9rem;
+}
+
+.selector-dropdown {
+  min-width: 250px;
+  height: 36px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.9rem;
+}
+
+.buttons-group {
+  display: flex; 
+  gap: 0.5rem;
+}
+
+.led-btn, .exit-btn {
+  height: 36px;
+  font-size: 0.85rem;
+  padding: 0 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.loading-state {
+  text-align: center; 
+  color: var(--text-secondary); 
+  padding: 5rem;
+  flex: 1;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.loading-spin {
+  width: 40px; 
+  height: 40px; 
+  border: 3px solid var(--color-cyan); 
+  border-top-color: transparent; 
+  border-radius: 50%; 
+  margin: 0 auto 1.5rem;
+  animation: spin 1.2s linear infinite;
+}
+
+.error-card {
+  text-align: center; 
+  color: var(--color-error); 
+  padding: 4rem;
+  flex: 1;
+}
+
+.error-icon {
+  margin-bottom: 1rem;
+}
+
+/* Widescreen 3-column layout without scroll, Column order rearranged: Control (1.1fr) -> Selector (0.9fr) -> Preview (1fr) */
+.presenter-admin-layout {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr 1fr;
+  gap: 1rem;
+  flex: 1;
+  min-height: 0; /* Important to make child overflow work correctly */
+}
+
+.dashboard-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 0;
+}
+
+/* SETUP CARD (ย่อให้เล็ก) */
+.setup-card {
+  padding: 0.75rem 1rem;
+  flex-shrink: 0;
+}
+
+.card-subtitle {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+}
+
+.setup-buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.4rem;
+}
+
+.btn-setup {
+  padding: 0.4rem 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  height: 32px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.btn-setup.active {
+  background: var(--color-cyan) !important;
+  color: #000 !important;
+  border-color: var(--color-cyan) !important;
+}
+
+/* CONTROLLER CARD */
+.controller-card {
+  padding: 1rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.controller-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .section-title {
-  font-size: 1.3rem;
-  color: #fff;
-  border-bottom: 1px solid var(--glass-border);
-  padding-bottom: 0.75rem;
-  margin-bottom: 1.25rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
 }
 
-.controller-card {
+.audio-controls-group {
   display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
+  gap: 0.4rem;
+}
+
+.toggle-audio-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .active-question-display {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  background: rgba(255, 255, 255, 0.015);
+  justify-content: space-between;
+  background: rgba(255,255,255,0.015);
   border: 1px solid var(--glass-border);
-  padding: 1.5rem;
-  border-radius: var(--radius-md);
-  gap: 0.5rem;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 1rem;
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
 }
 
-.active-q-label {
-  font-size: 0.9rem;
+.display-label {
+  font-size: 0.8rem;
   color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
-.active-q-controls {
+.display-controls {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 0.75rem;
 }
 
-.q-nav-btn {
-  width: 50px;
-  height: 50px;
+.nav-q-btn {
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   padding: 0;
   display: flex;
@@ -653,120 +773,353 @@ const handleExit = () => {
   justify-content: center;
 }
 
-.active-q-number {
+.active-q-num-text {
+  font-size: 1.6rem;
   font-family: var(--font-title);
-  font-size: 2.5rem;
   font-weight: 800;
   color: var(--color-cyan);
-  text-shadow: var(--shadow-neon-cyan);
 }
 
-.control-actions-stack {
+/* Vertically tight aligned controller actions */
+.state-commands-list {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.35rem; /* Closer vertical gap */
+  flex: 1;
+  justify-content: flex-start; /* Align closer to the top instead of stretching */
 }
 
-.control-btn {
-  width: 100%;
-  height: 60px;
-  font-size: 1.1rem;
+.cmd-state-btn {
+  padding: 0.5rem 0.75rem; /* Reduced padding for tighter sizing */
+  text-align: left;
   justify-content: flex-start;
-  padding: 0 1.5rem;
-  border-radius: var(--radius-md);
+  min-height: 44px; /* Reduced min-height */
+  border-radius: var(--radius-sm);
 }
 
-.active-btn {
-  background: linear-gradient(135deg, var(--color-cyan), var(--color-purple)) !important;
-  color: #000 !important;
-  font-weight: 800;
+.cmd-state-btn.active {
   box-shadow: var(--shadow-neon-cyan);
 }
 
-.active-btn-timer {
+.btn-show-question.active {
+  background: linear-gradient(135deg, var(--color-cyan), var(--color-purple)) !important;
+  color: #000 !important;
+  border-color: var(--color-cyan) !important;
+}
+
+.btn-start-timer.active {
   background: var(--color-error) !important;
   color: #fff !important;
-  font-weight: 800;
-  box-shadow: 0 0 15px rgba(255, 23, 68, 0.4);
+  border-color: var(--color-error) !important;
+  box-shadow: 0 0 10px rgba(255, 23, 68, 0.4) !important;
 }
 
-/* Q1-Q20 selection grid */
-.questions-admin-grid {
+.btn-reveal-answer.active {
+  background: var(--color-warning) !important;
+  color: #fff !important;
+  border-color: var(--color-warning) !important;
+  box-shadow: 0 0 10px rgba(255, 145, 0, 0.4) !important;
+}
+
+.btn-reveal-teams.active {
+  background: var(--color-success) !important;
+  color: #000 !important;
+  border-color: var(--color-success) !important;
+  box-shadow: 0 0 10px rgba(0, 230, 118, 0.4) !important;
+}
+
+.btn-double-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.btn-double-label strong {
+  font-size: 0.82rem; /* Slightly smaller text for compact alignment */
+}
+
+.btn-double-label small {
+  font-size: 0.65rem;
+  opacity: 0.85;
+}
+
+.btn-icon-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+/* MONITOR CARD */
+.monitor-card {
+  padding: 1rem;
+  flex: 1.6;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.monitor-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.preview-q-badge {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-cyan);
+}
+
+.preview-mode-badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+.bg-purple {
+  background-color: rgba(213, 0, 249, 0.15);
+  color: var(--color-purple);
+}
+
+.bg-cyan {
+  background-color: rgba(0, 229, 255, 0.15);
+  color: var(--color-cyan);
+}
+
+.preview-question-text {
+  font-size: 0.95rem;
+  line-height: 1.4;
+  color: var(--text-primary);
+  max-height: 80px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  flex-shrink: 0;
+}
+
+.previews-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 1rem;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  flex-shrink: 0;
 }
 
-.q-status-tile {
-  background: rgba(255, 255, 255, 0.015);
+.image-preview-box {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.image-lbl {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 65px;
+  object-fit: contain;
+  border-radius: 4px;
   border: 1px solid var(--glass-border);
+}
+
+.compact-choices-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.compact-choice-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--glass-border);
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.compact-choice-item.correct {
+  border-color: var(--color-success);
+  background: rgba(0, 230, 118, 0.08);
+}
+
+.compact-choice-item.correct .choice-tag {
+  background: var(--color-success);
+  color: #000;
+}
+
+.choice-tag {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg-tertiary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.choice-lbl {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.empty-monitor {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+  margin: auto;
+}
+
+.empty-icon {
+  color: var(--text-muted);
+  margin-bottom: 0.5rem;
+}
+
+/* STATS SUMMARY CARD */
+.stats-summary-card {
+  padding: 0.75rem 1rem;
+  flex-shrink: 0;
+}
+
+.stats-boxes-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.stat-box-container {
+  padding: 0.5rem;
   border-radius: var(--radius-sm);
-  padding: 1.25rem;
-  cursor: pointer;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.answers-received {
+  background: rgba(0,229,255,0.02);
+  border: 1px solid rgba(0,229,255,0.08);
+}
+
+.correct-answers {
+  background: rgba(0,230,118,0.02);
+  border: 1px solid rgba(0,230,118,0.08);
+}
+
+.stat-box-lbl {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.stat-box-val {
+  font-family: var(--font-title);
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.text-success {
+  color: var(--color-success);
+}
+
+/* QUESTIONS DIRECT SELECTOR */
+.questions-direct-selector {
+  padding: 1rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.selector-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-shrink: 0;
+}
+
+.refresh-q-btn {
+  padding: 0.25rem 0.5rem;
+  height: 28px;
+}
+
+.questions-buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.4rem;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.grid-q-btn {
+  padding: 0.25rem;
+  height: auto;
+  min-height: 54px;
+  border-radius: var(--radius-sm);
+}
+
+.grid-q-btn.active {
+  border-color: var(--color-cyan) !important;
+  box-shadow: var(--shadow-neon-cyan);
+}
+
+.q-tile-content {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
-  transition: all var(--transition-fast);
+  justify-content: center;
+  gap: 0.1rem;
 }
 
-.q-status-tile:hover {
-  border-color: var(--color-cyan);
-  background: rgba(0, 229, 255, 0.02);
-}
-
-.active-tile {
-  border-color: var(--color-cyan) !important;
-  background: rgba(0, 229, 255, 0.05) !important;
-  box-shadow: var(--shadow-neon-cyan);
-  transform: translateY(-2px);
-}
-
-.tile-number {
+.q-tile-number {
   font-family: var(--font-title);
-  font-size: 1.4rem;
+  font-size: 0.95rem;
   font-weight: 800;
   color: #fff;
 }
 
-.tile-indicators {
-  font-size: 0.75rem;
+.q-tile-badge {
+  font-size: 0.6rem;
+  opacity: 0.7;
+}
+
+.q-tile-ans {
+  font-size: 0.7rem;
   font-weight: 700;
+  color: var(--color-gold);
 }
 
-.badge-slide {
-  background: rgba(213, 0, 249, 0.15);
-  color: var(--color-purple);
-  padding: 0.15rem 0.5rem;
-  border-radius: 4px;
-}
-
-.badge-text {
-  background: rgba(0, 229, 255, 0.15);
-  color: var(--color-cyan);
-  padding: 0.15rem 0.5rem;
-  border-radius: 4px;
-}
-
-.badge-empty {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-muted);
-  padding: 0.15rem 0.5rem;
-  border-radius: 4px;
-}
-
-.tile-key {
-  font-size: 0.85rem;
+.no-round-selected {
+  text-align: center;
+  padding: 5rem;
   color: var(--text-secondary);
+  flex: 1;
 }
 
-.light-theme .section-title {
+.light-theme .q-tile-number {
   color: #0f172a;
-}
-.light-theme .tile-number {
-  color: #0f172a;
-}
-.light-theme .badge-empty {
-  background: rgba(0,0,0,0.05);
 }
 </style>

@@ -1,182 +1,98 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
-import { useRouter, useRoute } from '#imports'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { useSupabase } from '~/composables/useSupabase'
+import { useAuth } from '~/composables/useAuth'
+import { useRoundSelector } from '~/composables/useRoundSelector'
+import { TOTAL_QUESTIONS } from '~/utils/constants'
 import { 
   Award, 
-  HelpCircle, 
   ChevronLeft, 
   ChevronRight,
   LogOut,
   RefreshCw,
   Users,
-  CheckCircle
+  CheckCircle,
+  HelpCircle,
+  AlertCircle
 } from 'lucide-vue-next'
+import type { Team, Question, Answer } from '~/types'
 
-const router = useRouter()
 const route = useRoute()
 const { supabase, isConfigured } = useSupabase()
+const { validateStaffOrAdmin, logout } = useAuth()
 
-const selectedRoundId = ref('')
-const roundsList = ref<any[]>([])
-const currentRound = ref<any>(null)
-
-const teams = ref<any[]>([])
-const questions = ref<any[]>([])
-const answers = ref<any[]>([])
-const dataEntryProgress = ref<any[]>([])
+const teams = ref<Team[]>([])
+const questions = ref<Question[]>([])
+const answers = ref<Answer[]>([])
 
 const selectedQuestion = ref(1)
 const loading = ref(true)
 const passkeyValid = ref(false)
+const answersChannel = ref<any>(null)
 
-onMounted(async () => {
-  // 1. Check Passkey Authorization Guard
-  if (typeof window !== 'undefined') {
-    const adminKey = localStorage.getItem('admin_passkey') || ''
-    const staffKey = localStorage.getItem('staff_key') || ''
-    
-    if (!adminKey && !staffKey) {
-      router.push('/')
-      return
-    }
-    
-    // Verify passkey against DB
-    const validated = await verifyAuth(adminKey, staffKey)
-    if (!validated) {
-      router.push('/')
-      return
-    }
-    passkeyValid.value = true
-  }
-
-  if (isConfigured.value) {
-    fetchRounds()
-  }
-})
-
-const verifyAuth = async (adminKey: string, staffKey: string) => {
-  if (!supabase.value) return false
-  
-  if (adminKey) {
-    const { data } = await supabase.value.rpc('validate_passkey', { p_role: 'admin', p_passkey: adminKey })
-    if (data) return true
-  }
-  if (staffKey) {
-    const { data } = await supabase.value.rpc('validate_passkey', { p_role: 'staff', p_passkey: staffKey })
-    if (data) return true
-  }
-  return false
-}
-
-watch(roundsList, () => {
-  if (roundsList.value.length > 0) {
-    const queryId = route.query.round as string
-    if (queryId && roundsList.value.some(r => r.id === queryId)) {
-      selectedRoundId.value = queryId
-    } else {
-      selectedRoundId.value = roundsList.value[0].id
-    }
-    handleRoundChange()
-  }
-})
-
-const fetchRounds = async () => {
-  if (!supabase.value) return
-  const { data } = await supabase.value
-    .from('rounds')
-    .select('*')
-    .order('created_at', { ascending: false })
-  if (data) {
-    roundsList.value = data
-  }
-}
-
-const handleRoundChange = async () => {
-  if (!supabase.value || !selectedRoundId.value) return
+// Callback when selected round changes
+const onRoundChanged = async (roundId: string) => {
+  if (!supabase.value || !roundId) return
   loading.value = true
   
   try {
-    const { data: rData } = await supabase.value
-      .from('rounds')
-      .select('*')
-      .eq('id', selectedRoundId.value)
-      .single()
-    currentRound.value = rData
-
     const { data: tData } = await supabase.value
       .from('teams')
       .select('*')
-      .eq('round_id', selectedRoundId.value)
+      .eq('round_id', roundId)
       .order('team_number', { ascending: true })
-    teams.value = tData || []
+    teams.value = (tData || []) as Team[]
 
     const { data: qData } = await supabase.value
       .from('questions')
       .select('*')
-      .eq('round_id', selectedRoundId.value)
-    questions.value = qData || []
+      .eq('round_id', roundId)
+    questions.value = (qData || []) as Question[]
 
     await fetchAnswers()
-    await fetchProgress()
     
     // Subscribe to realtime answer updates
-    supabase.value
+    cleanupAnswersSubscription()
+    
+    answersChannel.value = supabase.value
       .channel('mc-answers')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'answers' }, () => {
         fetchAnswers()
-        fetchProgress()
       })
       .subscribe()
       
   } catch (err) {
-    console.error(err)
+    console.error('Error loading round data in MC view:', err)
   } finally {
     loading.value = false
   }
 }
 
-const fetchProgress = async () => {
-  if (!supabase.value || !selectedRoundId.value) return
-  
-  const { data: countData } = await supabase.value
-    .rpc('get_answers_progress', { r_id: selectedRoundId.value })
-  
-  if (countData) {
-    dataEntryProgress.value = countData
-  } else {
-    // Fallback
-    const roundTeamIds = teams.value.map(t => t.id)
-    if (roundTeamIds.length === 0) {
-      dataEntryProgress.value = Array.from({ length: 20 }, (_, i) => ({
-        question_number: i + 1,
-        submitted_count: 0
-      }))
-      return
-    }
+// Using useRoundSelector composable
+const {
+  selectedRoundId,
+  roundsList,
+  currentRound,
+  handleRoundChange
+} = useRoundSelector(onRoundChanged)
 
-    const { data: answersData } = await supabase.value
-      .from('answers')
-      .select('question_number, submitted_answer')
-      .in('team_id', roundTeamIds)
-      
-    const counts: Record<number, number> = {}
-    for (let i = 1; i <= 20; i++) counts[i] = 0
-    
-    if (answersData) {
-      answersData.forEach(ans => {
-        if (ans.submitted_answer) {
-          counts[ans.question_number] = (counts[ans.question_number] || 0) + 1
-        }
-      })
-    }
-    
-    dataEntryProgress.value = Object.keys(counts).map(k => ({
-      question_number: parseInt(k),
-      submitted_count: counts[parseInt(k)]
-    }))
+const cleanupAnswersSubscription = () => {
+  if (answersChannel.value && supabase.value) {
+    supabase.value.removeChannel(answersChannel.value)
+    answersChannel.value = null
   }
 }
+
+onMounted(async () => {
+  const isValid = await validateStaffOrAdmin()
+  if (!isValid) return
+  passkeyValid.value = true
+})
+
+onUnmounted(() => {
+  cleanupAnswersSubscription()
+})
 
 const fetchAnswers = async () => {
   if (!supabase.value || teams.value.length === 0) return
@@ -185,12 +101,30 @@ const fetchAnswers = async () => {
     .from('answers')
     .select('*')
     .in('team_id', teamIds)
-  answers.value = data || []
+  answers.value = (data || []) as Answer[]
 }
 
-// ==========================================
-// PRESENTATION CALCULATIONS
-// ==========================================
+// Compute submitted and correct counts client-side dynamically for all 20 questions
+const questionStatsSummary = computed(() => {
+  const summary: Record<number, { submitted: number; correct: number }> = {}
+  for (let i = 1; i <= TOTAL_QUESTIONS; i++) {
+    summary[i] = { submitted: 0, correct: 0 }
+  }
+  
+  answers.value.forEach(ans => {
+    const qNum = ans.question_number
+    if (qNum >= 1 && qNum <= TOTAL_QUESTIONS) {
+      if (ans.submitted_answer) {
+        summary[qNum].submitted++
+      }
+      if (ans.is_correct) {
+        summary[qNum].correct++
+      }
+    }
+  })
+  
+  return summary
+})
 
 // Correct answer choice for current question
 const currentQuestionCorrectAnswer = computed(() => {
@@ -209,8 +143,7 @@ const correctTeamsList = computed(() => {
 
 // Number of teams that have submitted an answer for the current question
 const currentQuestionSubmittedCount = computed(() => {
-  const prog = dataEntryProgress.value.find(p => p.question_number === selectedQuestion.value)
-  return prog ? prog.submitted_count : 0
+  return questionStatsSummary.value[selectedQuestion.value]?.submitted || 0
 })
 
 // Whether all teams have submitted an answer for the current question
@@ -218,262 +151,655 @@ const isCurrentQuestionFullySubmitted = computed(() => {
   return teams.value.length > 0 && currentQuestionSubmittedCount.value === teams.value.length
 })
 
-const handleExit = () => {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('staff_key')
-    localStorage.removeItem('admin_passkey')
-  }
-  router.push('/')
-}
+// List of teams who have NOT yet submitted an answer for the current question
+const pendingTeamsList = computed(() => {
+  if (teams.value.length === 0) return []
+  return teams.value.filter(team => {
+    const ansRow = answers.value.find(a => a.team_id === team.id && a.question_number === selectedQuestion.value)
+    return !ansRow || !ansRow.submitted_answer
+  })
+})
 </script>
 
 <template>
-  <div class="container" v-if="passkeyValid">
+  <div class="container mc-dashboard" v-if="passkeyValid">
     
-    <!-- Top Configuration / Action Bar -->
-    <div class="glass-card" style="margin-bottom: 2rem; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;">
-      <div style="display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 280px;">
-        <label class="form-label" style="margin-bottom: 0; white-space: nowrap;">เลือกรอบการแข่งขัน:</label>
-        <select v-model="selectedRoundId" @change="handleRoundChange" class="form-input" style="max-width: 320px;">
-          <option v-for="r in roundsList" :key="r.id" :value="r.id">{{ r.name }}</option>
-        </select>
+    <!-- Top Configuration / Compact Action Bar -->
+    <div class="glass-card action-bar">
+      <div class="header-branding">
+        <h1 class="mc-nav-title">แผงควบคุมพิธีกร (MC Monitor)</h1>
+        <span class="round-badge" v-if="currentRound">{{ currentRound.name }}</span>
       </div>
 
-      <button @click="handleExit" class="btn btn-secondary" style="display: flex; align-items: center; gap: 0.25rem;">
-        <LogOut :size="16" />
-        <span>ออกจากระบบ MC</span>
+      <div class="selector-group">
+        <label class="form-label selector-label">รอบแข่งขัน:</label>
+        <select v-model="selectedRoundId" @change="handleRoundChange" class="form-input round-select">
+          <option v-for="r in roundsList" :key="r.id" :value="r.id">{{ r.name }}</option>
+        </select>
+        
+        <button @click="fetchAnswers" class="btn btn-secondary refresh-btn" title="รีเฟรชสถิติ">
+          <RefreshCw :size="14" />
+        </button>
+      </div>
+
+      <button @click="logout" class="btn btn-secondary exit-btn">
+        <LogOut :size="14" />
+        <span>ออกจากระบบ</span>
       </button>
     </div>
 
     <!-- Loading State -->
-    <div v-if="loading" style="text-align: center; color: var(--text-secondary); padding: 5rem;">
-      <div class="loading-spin" style="width: 40px; height: 40px; border: 3px solid var(--color-cyan); border-top-color: transparent; border-radius: 50%; margin: 0 auto 1.5rem;"></div>
-      <p>กำลังเตรียมสถิติรายข้อสำหรับพิธีกร...</p>
+    <div v-if="loading" class="loading-container">
+      <div class="loading-spin"></div>
+      <p>กำลังเตรียมข้อมูลสำหรับพิธีกร...</p>
     </div>
 
     <template v-else-if="currentRound">
-      <div style="text-align: center; margin-bottom: 2rem;">
-        <h1 style="font-size: 2.2rem; background: linear-gradient(135deg, var(--color-cyan), var(--color-purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.25rem;">
-          หน้าจอควบคุมสำหรับพิธีกร (MC View)
-        </h1>
-        <p style="color: var(--text-secondary); font-size: 1.05rem;">
-          {{ currentRound.name }} • คัดกรองรายข้อแบบเรียลไทม์
-        </p>
-      </div>
-
-      <!-- Main MC Layout Split Grid -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; align-items: start;">
+      <!-- Main Layout Split Grid (Single Screen, No Scroll) -->
+      <div class="mc-split-grid">
         
-        <!-- Left: Question Selector and Answer Key -->
-        <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <!-- LEFT COLUMN: SELECTED QUESTION & 20-QUESTION PROGRESS BOARD -->
+        <div class="mc-column col-left">
           
-          <div class="glass-card" style="border-color: var(--glass-border-glow); padding: 2rem; text-align: center;">
-            <h2 style="font-size: 1.4rem; color: var(--text-secondary); margin-bottom: 1rem;">แสดงรายชื่อผู้ตอบถูก</h2>
-            
-            <div style="display: flex; align-items: center; justify-content: center; gap: 1.5rem; margin-bottom: 1.5rem;">
+          <!-- Card 1: Selected Question Info -->
+          <div class="glass-card status-card">
+            <div class="navigation-controls">
               <button 
                 @click="selectedQuestion = Math.max(1, selectedQuestion - 1)" 
-                class="btn btn-secondary" 
-                style="width: 46px; height: 46px; border-radius: 50%; font-size: 1.25rem; padding: 0;"
+                class="btn btn-secondary nav-arrow-btn" 
                 :disabled="selectedQuestion === 1"
               >
-                <ChevronLeft :size="20" />
+                <ChevronLeft :size="16" />
               </button>
               
-              <div style="font-size: 3.5rem; font-family: var(--font-title); font-weight: 800; color: var(--color-cyan); text-shadow: var(--shadow-neon-cyan); min-width: 140px;">
+              <div class="question-display-text">
                 ข้อที่ {{ selectedQuestion }}
               </div>
               
               <button 
-                @click="selectedQuestion = Math.min(20, selectedQuestion + 1)" 
-                class="btn btn-secondary" 
-                style="width: 46px; height: 46px; border-radius: 50%; font-size: 1.25rem; padding: 0;"
-                :disabled="selectedQuestion === 20"
+                @click="selectedQuestion = Math.min(TOTAL_QUESTIONS, selectedQuestion + 1)" 
+                class="btn btn-secondary nav-arrow-btn" 
+                :disabled="selectedQuestion === TOTAL_QUESTIONS"
               >
-                <ChevronRight :size="20" />
+                <ChevronRight :size="16" />
               </button>
             </div>
 
-            <!-- Answer Key banner -->
-            <div style="background: rgba(255,255,255,0.02); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--glass-border);">
-              <span style="font-size: 0.9rem; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">เฉลยที่ถูกต้อง:</span>
-              <span class="status-pill completed" style="background: rgba(0, 229, 255, 0.15); font-size: 1.5rem; font-weight: 800; padding: 0.4rem 1.5rem;">
-                {{ currentQuestionCorrectAnswer }}
-              </span>
-            </div>
-
-            <!-- Stats -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1.5rem;">
-              <div style="background: rgba(0, 230, 118, 0.05); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid rgba(0, 230, 118, 0.15);">
-                <span style="font-size: 0.8rem; color: var(--text-secondary); display: block;">ตอบถูก</span>
-                <span style="font-size: 1.5rem; font-family: var(--font-title); font-weight: 800; color: var(--color-success);">
-                  {{ correctTeamsList.length }} ทีม
+            <!-- Stats Horizontal List -->
+            <div class="stats-row">
+              <div class="stat-item highlight-ans">
+                <span class="stat-lbl">เฉลย:</span>
+                <span class="stat-val-text text-gold">{{ currentQuestionCorrectAnswer }}</span>
+              </div>
+              
+              <div class="stat-item">
+                <span class="stat-lbl">ส่งคำตอบ:</span>
+                <span class="stat-val-text" :class="isCurrentQuestionFullySubmitted ? 'text-success' : 'text-cyan'">
+                  {{ currentQuestionSubmittedCount }}/{{ teams.length }}
                 </span>
               </div>
-              <div style="background: rgba(255, 255, 255, 0.02); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--glass-border);">
-                <span style="font-size: 0.8rem; color: var(--text-secondary); display: block;">คิดเป็น</span>
-                <span style="font-size: 1.5rem; font-family: var(--font-title); font-weight: 800; color: var(--color-cyan);">
-                  {{ teams.length > 0 ? Math.round((correctTeamsList.length / teams.length) * 100) : 0 }}%
-                </span>
+
+              <div class="stat-item">
+                <span class="stat-lbl">ตอบถูก:</span>
+                <span class="stat-val-text text-success">{{ correctTeamsList.length }} ทีม</span>
               </div>
             </div>
           </div>
 
-          <!-- Q1-Q20 Grid Selector -->
-          <div class="glass-card">
-            <h3 style="margin-bottom: 1rem; font-size: 1.1rem; color: var(--text-primary);">รายการคำถามทั้งหมด</h3>
-            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem;">
-              <button 
-                v-for="i in 20" 
-                :key="i"
-                @click="selectedQuestion = i"
-                class="btn"
-                :class="selectedQuestion === i ? 'btn-primary' : 'btn-secondary'"
-                style="padding: 0.5rem 0; font-size: 0.9rem; font-family: var(--font-title); font-weight: 700; height: 42px; border-radius: 6px;"
-              >
-                Q{{ i }}
-              </button>
+          <!-- Card 2: 20-Question Progress Board (Moved here!) -->
+          <div class="glass-card board-card">
+            <div class="board-header">
+              <h2 class="board-title">กระดานคีย์คำตอบและผล (20 ข้อ)</h2>
+              <span class="board-indicator-lbl">*คลิกเลือกข้อ*</span>
             </div>
-          </div>
 
-        </div>
-
-        <!-- Right: Correct Teams List -->
-        <div 
-          class="glass-card" 
-          :class="{ 'fully-submitted-card': isCurrentQuestionFullySubmitted }"
-          style="min-height: 480px; display: flex; flex-direction: column; transition: all 0.3s ease;"
-        >
-          <h2 style="font-size: 1.3rem; margin-bottom: 1rem; color: var(--color-cyan); display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.75rem;">
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
-              <Award :size="22" style="color: var(--color-gold);" />
-              <span>ทีมที่ตอบถูกในข้อนี้ ({{ correctTeamsList.length }} ทีม)</span>
-            </div>
-            <div 
-              class="status-pill-custom"
-              :class="{ 'fully-submitted-pill': isCurrentQuestionFullySubmitted }"
-            >
-              คีย์แล้ว: {{ currentQuestionSubmittedCount }} / {{ teams.length }} ทีม
-            </div>
-          </h2>
-
-          <div v-if="correctTeamsList.length === 0" style="margin: auto; text-align: center; color: var(--text-secondary);">
-            <Users :size="48" style="color: var(--text-muted); margin-bottom: 1rem;" />
-            <p>ยังไม่มีทีมที่ตอบถูกในข้อนี้</p>
-          </div>
-
-          <div v-else style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; overflow-y: auto; flex: 1; max-height: 500px; padding-right: 0.5rem; align-content: start;">
-            <div 
-              v-for="team in correctTeamsList" 
-              :key="team.id"
-              class="glass-card"
-              style="background: rgba(0, 230, 118, 0.05); border-color: rgba(0, 230, 118, 0.2); padding: 0.75rem 1.25rem; display: flex; align-items: center; justify-content: space-between; cursor: help;"
-              :title="team.name"
-            >
-              <span style="font-family: var(--font-title); font-weight: 800; font-size: 2.0rem; color: var(--color-gold); text-shadow: var(--shadow-neon-cyan);">
-                TEAM {{ String(team.team_number).padStart(2, '0') }}
-              </span>
-              <CheckCircle :size="28" style="color: var(--color-success); flex-shrink: 0;" />
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Bottom: Data Entry Progress for MC -->
-      <div class="glass-card" style="margin-top: 2rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-          <div>
-            <h3 style="font-size: 1.25rem; color: var(--text-primary);">ความคืบหน้าการบันทึกข้อมูลคำตอบ (คีย์ครบถ้วนแสดงเป็นสีเขียว)</h3>
-            <p style="color: var(--text-secondary); font-size: 0.85rem;">
-              ตรวจสอบว่าคำตอบถูกบันทึกเข้าระบบครบทุกทีมแล้วหรือไม่ (มีทีมทั้งหมด {{ teams.length }} ทีม)
-            </p>
-          </div>
-          <button @click="fetchProgress" class="btn btn-secondary" style="display: flex; align-items: center; gap: 0.25rem;">
-            <RefreshCw :size="14" />
-            <span>รีเฟรชความคืบหน้า</span>
-          </button>
-        </div>
-
-        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem;">
-          <div 
-            v-for="prog in dataEntryProgress" 
-            :key="prog.question_number" 
-            class="glass-card" 
-            :style="prog.submitted_count === teams.length 
-              ? 'border-color: rgba(0, 230, 118, 0.4); background: rgba(0, 230, 118, 0.04); display: flex; flex-direction: column; gap: 0.5rem;' 
-              : 'display: flex; flex-direction: column; gap: 0.5rem;'"
-          >
-            <div style="display: flex; justify-content: space-between; font-weight: 700;">
-              <span :style="prog.submitted_count === teams.length ? 'color: var(--color-success);' : 'color: var(--color-cyan);'">ข้อที่ {{ prog.question_number }}</span>
-              <span :style="prog.submitted_count === teams.length ? 'color: var(--color-success); font-weight: 800;' : ''">
-                {{ prog.submitted_count }} / {{ teams.length }} ทีม
-              </span>
-            </div>
-            
-            <!-- Progress Bar -->
-            <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden;">
+            <div class="progress-grid">
               <div 
-                :style="`width: ${teams.length > 0 ? (prog.submitted_count / teams.length) * 100 : 0}%`"
-                :class="prog.submitted_count === teams.length ? 'bg-success' : 'bg-cyan'"
-                style="height: 100%; border-radius: 3px;"
-              ></div>
+                v-for="i in TOTAL_QUESTIONS" 
+                :key="i" 
+                class="progress-tile"
+                :class="{ 
+                  'active-tile': selectedQuestion === i,
+                  'completed-tile': questionStatsSummary[i]?.submitted === teams.length,
+                  'empty-tile': questionStatsSummary[i]?.submitted === 0
+                }"
+                @click="selectedQuestion = i"
+              >
+                <div class="tile-q-name">Q{{ i }}</div>
+                
+                <div class="tile-progress-ratio">
+                  {{ questionStatsSummary[i]?.submitted }}/{{ teams.length }}
+                </div>
+
+                <div class="tile-bar-bg">
+                  <div 
+                    class="tile-bar-fill"
+                    :style="`width: ${teams.length > 0 ? (questionStatsSummary[i]?.submitted / teams.length) * 100 : 0}%`"
+                    :class="questionStatsSummary[i]?.submitted === teams.length ? 'fill-success' : 'fill-cyan'"
+                  ></div>
+                </div>
+              </div>
             </div>
 
-            <div style="font-size: 0.75rem; text-align: right;" :style="prog.submitted_count === teams.length ? 'color: var(--color-success); font-weight: 800;' : 'color: var(--text-secondary);'">
-              {{ prog.submitted_count === teams.length ? 'บันทึกครบถ้วนแล้ว' : 'ยังบันทึกไม่ครบ' }}
+            <!-- Dashboard Legend labels -->
+            <div class="dashboard-legend">
+              <div class="legend-item"><span class="legend-color bg-success-legend"></span> <span>ครบ (Green)</span></div>
+              <div class="legend-item"><span class="legend-color bg-cyan-legend"></span> <span>กำลังบันทึก (Cyan)</span></div>
+              <div class="legend-item"><span class="legend-color bg-grey-legend"></span> <span>ยังไม่เริ่ม (Grey)</span></div>
             </div>
           </div>
+
         </div>
+
+        <!-- RIGHT COLUMN: SPLIT CORRECT / PENDING TEAMS LISTS (Prominent space) -->
+        <div class="mc-column col-right">
+          
+          <!-- Card 3: Split Correct / Pending Teams list (Moved here!) -->
+          <div class="glass-card teams-list-card" :class="{ 'fully-submitted-card': isCurrentQuestionFullySubmitted }">
+            <div class="split-lists-container">
+              
+              <!-- Correct Teams Sub-column -->
+              <div class="sub-column list-correct">
+                <h2 class="column-subtitle text-success">
+                  <Award :size="14" class="text-gold" />
+                  <span>ทีมตอบถูก ({{ correctTeamsList.length }} ทีม)</span>
+                </h2>
+                
+                <div v-if="correctTeamsList.length === 0" class="no-teams-placeholder">
+                  <span>ไม่มีทีมตอบถูก</span>
+                </div>
+                <div v-else class="badges-grid">
+                  <div class="team-badge badge-correct" v-for="team in correctTeamsList" :key="team.id" :title="team.name">
+                    {{ String(team.team_number).padStart(2, '0') }}
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Pending Teams Sub-column -->
+              <div class="sub-column list-pending">
+                <h2 class="column-subtitle text-warning">
+                  <AlertCircle :size="14" />
+                  <span>ยังไม่คีย์ ({{ pendingTeamsList.length }} ทีม)</span>
+                </h2>
+                
+                <div v-if="pendingTeamsList.length === 0" class="no-teams-placeholder text-success">
+                  <CheckCircle :size="14" />
+                  <span>คีย์ครบถ้วนแล้ว</span>
+                </div>
+                <div v-else class="badges-grid">
+                  <div class="team-badge badge-pending" v-for="team in pendingTeamsList" :key="team.id" :title="team.name">
+                    {{ String(team.team_number).padStart(2, '0') }}
+                  </div>
+                </div>
+              </div>
+              
+            </div>
+          </div>
+
+        </div>
+
       </div>
     </template>
   </div>
 </template>
 
 <style scoped>
+/* Main Dashboard layout constraints to fit single page */
+.mc-dashboard {
+  max-width: 1600px;
+  height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 1rem 1.5rem;
+}
+
+.action-bar {
+  margin-bottom: 1rem; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  padding: 0.5rem 1.25rem;
+  flex-shrink: 0;
+  gap: 1rem;
+}
+
+.header-branding {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.mc-nav-title {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #fff;
+  margin: 0;
+}
+
+.round-badge {
+  background: rgba(0, 229, 255, 0.12);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  color: var(--color-cyan);
+  font-size: 0.75rem;
+  padding: 0.15rem 0.6rem;
+  border-radius: 12px;
+  font-weight: 700;
+}
+
+.selector-group {
+  display: flex; 
+  align-items: center; 
+  gap: 0.5rem;
+}
+
+.selector-label {
+  margin-bottom: 0; 
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+
+.round-select {
+  width: 200px;
+  height: 32px;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.5rem;
+}
+
+.refresh-btn {
+  height: 32px;
+  padding: 0 0.5rem;
+}
+
+.exit-btn {
+  height: 32px;
+  font-size: 0.82rem;
+  padding: 0 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.loading-container {
+  text-align: center; 
+  color: var(--text-secondary); 
+  padding: 5rem;
+  flex: 1;
+}
+
+.loading-spin {
+  width: 40px; 
+  height: 40px; 
+  border: 3px solid var(--color-cyan); 
+  border-top-color: transparent; 
+  border-radius: 50%; 
+  margin: 0 auto 1.5rem;
+  animation: spin 1.2s linear infinite;
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
-.loading-spin {
-  animation: spin 1.2s linear infinite;
+
+/* 2 Column Layout (Left: Control/Badges, Right: 20Q Board) */
+.mc-split-grid {
+  display: grid; 
+  grid-template-columns: 0.8fr 1.2fr; 
+  gap: 1rem; 
+  flex: 1;
+  min-height: 0; /* Constraints overflow */
 }
 
-.fully-submitted-card {
-  border-color: var(--color-success) !important;
-  background: rgba(0, 230, 118, 0.04) !important;
-  box-shadow: 0 0 15px rgba(0, 230, 118, 0.1) !important;
+.mc-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-height: 0;
 }
 
-:global(.light-theme) .fully-submitted-card {
-  background: rgba(46, 125, 50, 0.04) !important;
-  box-shadow: 0 0 15px rgba(46, 125, 50, 0.1) !important;
+/* LEFT COLUMN CARDS */
+.status-card {
+  padding: 0.75rem 1.25rem;
+  text-align: center;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
-.status-pill-custom {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-secondary);
+.navigation-controls {
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  gap: 1.25rem;
+}
+
+.nav-arrow-btn {
+  width: 32px; 
+  height: 32px; 
+  border-radius: 50%; 
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.question-display-text {
+  font-size: 2rem; 
+  font-family: var(--font-title); 
+  font-weight: 800; 
+  color: var(--color-cyan); 
+  text-shadow: var(--shadow-neon-cyan); 
+  min-width: 100px;
+}
+
+.stats-row {
+  display: flex;
+  justify-content: space-around;
+  align-items: center; /* Center items vertically */
+  background: rgba(255,255,255,0.01);
   border: 1px solid var(--glass-border);
-  font-size: 0.85rem;
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-  white-space: nowrap;
+  padding: 0.4rem;
+  border-radius: var(--radius-sm);
 }
 
-:global(.light-theme) .status-pill-custom {
-  background: rgba(15, 23, 42, 0.04);
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
-.fully-submitted-pill {
-  background: rgba(0, 230, 118, 0.15) !important;
-  color: var(--color-success) !important;
-  border-color: rgba(0, 230, 118, 0.3) !important;
+.highlight-ans {
+  border-right: 1px solid var(--glass-border);
+  padding-right: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.highlight-ans .stat-lbl {
+  font-size: 0.78rem;
   font-weight: 700;
 }
 
-:global(.light-theme) .fully-submitted-pill {
-  background: rgba(46, 125, 50, 0.12) !important;
+.highlight-ans .stat-val-text {
+  font-size: 2.6rem; /* Make correct answer (เฉลย) extremely large and clear */
+  line-height: 1.1;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.45);
+}
+
+.stat-lbl {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.stat-val-text {
+  font-family: var(--font-title);
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.text-gold {
+  color: var(--color-gold);
+}
+
+.text-success {
+  color: var(--color-success);
+}
+
+.text-cyan {
+  color: var(--color-cyan);
+}
+
+/* TEAMS LIST CARD (Compact Badges List) */
+.teams-list-card {
+  flex: 1; 
+  display: flex; 
+  flex-direction: column; 
+  padding: 1rem;
+  min-height: 0;
+}
+
+.split-lists-container {
+  display: grid;
+  grid-template-columns: 1.4fr 0.6fr; /* 70% for Correct, 30% for Pending */
+  gap: 1rem;
+  flex: 1;
+  min-height: 0;
+}
+
+.sub-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 0;
+}
+
+.column-subtitle {
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 0.25rem;
+  margin-bottom: 0.25rem;
+  flex-shrink: 0;
+}
+
+.list-correct .badges-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+  gap: 0.5rem;
+  overflow-y: auto;
+  flex: 1;
+  align-content: start;
+}
+
+.list-pending .badges-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  gap: 0.35rem;
+  overflow-y: auto;
+  flex: 1;
+  align-content: start;
+}
+
+.team-badge {
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-title);
+}
+
+.badge-correct {
+  background: rgba(0, 230, 118, 0.08);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+  color: var(--color-success);
+  font-size: 2rem; /* Even larger font size */
+  font-weight: 850;
+  height: 56px; /* Increased height */
+  border-radius: 8px;
+}
+
+.badge-pending {
+  background: rgba(255, 145, 0, 0.08);
+  border: 1px solid rgba(255, 145, 0, 0.3);
+  color: var(--color-warning);
+  font-size: 0.8rem; /* Smaller font size */
+  font-weight: 700;
+  height: 24px; /* Smaller height */
+}
+
+.no-teams-placeholder {
+  margin: auto;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.fully-submitted-card {
+  border-color: rgba(0, 230, 118, 0.35) !important;
+  background: rgba(0, 230, 118, 0.02) !important;
+}
+
+/* RIGHT COLUMN: OVERVIEW BOARD */
+.board-card {
+  padding: 1rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.board-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
+}
+
+.board-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.board-indicator-lbl {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.progress-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.5rem;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.progress-tile {
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid var(--glass-border);
+  border-radius: 6px;
+  padding: 0.25rem 0.4rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  transition: all var(--transition-fast);
+  height: auto;
+  min-height: 48px;
+  justify-content: space-between;
+}
+
+.progress-tile:hover {
+  border-color: var(--color-cyan);
+  background: rgba(0, 229, 255, 0.02);
+}
+
+.active-tile {
+  border-color: var(--color-cyan) !important;
+  box-shadow: var(--shadow-neon-cyan);
+  background: rgba(0, 229, 255, 0.04) !important;
+}
+
+.completed-tile {
+  background: rgba(0, 230, 118, 0.04);
+  border-color: rgba(0, 230, 118, 0.25);
+}
+
+.empty-tile {
+  opacity: 0.55;
+}
+
+.tile-q-name {
+  font-family: var(--font-title);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.tile-progress-ratio {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.completed-tile .tile-progress-ratio {
+  color: var(--color-success);
+}
+
+.tile-bar-bg {
+  width: 100%;
+  height: 4px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.tile-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+}
+
+.fill-success {
+  background-color: var(--color-success);
+}
+
+.fill-cyan {
+  background-color: var(--color-cyan);
+}
+
+.tile-correct-count {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  border-top: 1px dashed var(--glass-border);
+  padding-top: 0.15rem;
+  margin-top: 0.15rem;
+}
+
+.dashboard-legend {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--glass-border);
+  padding-top: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.legend-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.bg-success-legend { background-color: rgba(0, 230, 118, 0.3); border: 1px solid var(--color-success); }
+.bg-cyan-legend { background-color: rgba(0, 229, 255, 0.2); border: 1px solid var(--color-cyan); }
+.bg-grey-legend { background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); }
+
+.light-theme .tile-q-name {
+  color: #0f172a;
+}
+.light-theme .mc-nav-title {
+  color: #0f172a;
 }
 </style>

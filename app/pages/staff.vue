@@ -1,27 +1,26 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useSupabase } from '~/composables/useSupabase'
+import { useAuth } from '~/composables/useAuth'
+import { useRoundSelector } from '~/composables/useRoundSelector'
+import { TOTAL_QUESTIONS } from '~/utils/constants'
 import { 
   Users, 
-  HelpCircle, 
   Settings, 
   CheckCircle,
   AlertCircle,
   Filter,
   LogOut
 } from 'lucide-vue-next'
+import type { Team, Answer } from '~/types'
 
 const route = useRoute()
-const router = useRouter()
 const { supabase, isConfigured } = useSupabase()
-
-const selectedRoundId = ref('')
-const roundsList = ref<any[]>([])
-const currentRound = ref<any>(null)
+const { validateStaffOrAdmin, getActivePasskey, logout } = useAuth()
 
 // Questions & Teams
-const teams = ref<any[]>([])
+const teams = ref<Team[]>([])
 const selectedQuestion = ref(1)
 const answersMap = ref<Record<string, string>>({}) // key: teamId-questionNo, val: submitted_answer
 
@@ -42,7 +41,7 @@ const setupAnswersSubscription = () => {
       event: '*',
       schema: 'public',
       table: 'answers'
-    }, (payload) => {
+    }, (payload: any) => {
       const updated = payload.new as any
       const deleted = payload.old as any
       
@@ -75,41 +74,44 @@ const showFilterModal = ref(false)
 const loading = ref(false)
 const savingStatus = ref<Record<string, 'idle' | 'saving' | 'saved' | 'error'>>({})
 
-onMounted(async () => {
-  if (typeof window !== 'undefined') {
-    const staffKey = localStorage.getItem('staff_key') || ''
-    const adminKey = localStorage.getItem('admin_passkey') || ''
-    
-    if (!staffKey && !adminKey) {
-      router.push('/')
-      return
-    }
-    
-    // Verify
-    let isValid = false
-    if (supabase.value) {
-      if (staffKey) {
-        const { data } = await supabase.value.rpc('validate_passkey', { p_role: 'staff', p_passkey: staffKey })
-        if (data) isValid = true
-      }
-      if (!isValid && adminKey) {
-        const { data } = await supabase.value.rpc('validate_passkey', { p_role: 'admin', p_passkey: adminKey })
-        if (data) isValid = true
-      }
-    }
-    
-    if (!isValid) {
-      router.push('/')
-      return
-    }
-    
-    staffPasskey.value = staffKey || adminKey // Use whichever is present
-    passkeyValid.value = true
+// Callback when selected round changes
+const onRoundChanged = async (roundId: string) => {
+  if (!supabase.value || !roundId) return
+  loading.value = true
+  
+  try {
+    const { data: tData } = await supabase.value
+      .from('teams')
+      .select('*')
+      .eq('round_id', roundId)
+      .order('team_number', { ascending: true })
+    teams.value = (tData || []) as Team[]
+
+    await fetchAnswers()
+    setupAnswersSubscription()
+  } catch (err) {
+    console.error('Error loading round details in staff view:', err)
+  } finally {
+    loading.value = false
   }
+}
+
+// Using useRoundSelector composable
+const {
+  selectedRoundId,
+  roundsList,
+  currentRound,
+  handleRoundChange
+} = useRoundSelector(onRoundChanged)
+
+onMounted(async () => {
+  const isValid = await validateStaffOrAdmin()
+  if (!isValid) return
+  
+  staffPasskey.value = getActivePasskey()
+  passkeyValid.value = true
 
   if (isConfigured.value) {
-    fetchRounds()
-    
     // Load local storage preferences
     if (typeof window !== 'undefined') {
       staffName.value = localStorage.getItem('staff_name') || ''
@@ -152,60 +154,6 @@ watch(staffPasskey, (val) => {
     localStorage.setItem('staff_key', val)
   }
 })
-
-watch(roundsList, () => {
-  if (roundsList.value.length > 0) {
-    const queryId = route.query.round as string
-    if (queryId && roundsList.value.some(r => r.id === queryId)) {
-      selectedRoundId.value = queryId
-    } else {
-      selectedRoundId.value = roundsList.value[0].id
-    }
-    handleRoundChange()
-  }
-})
-
-const fetchRounds = async () => {
-  if (!supabase.value) return
-  const { data } = await supabase.value
-    .from('rounds')
-    .select('*')
-    .order('created_at', { ascending: false })
-  if (data) {
-    roundsList.value = data
-  }
-}
-
-const handleRoundChange = async () => {
-  if (!supabase.value || !selectedRoundId.value) return
-  loading.value = true
-  
-  // Load round
-  const { data: rData } = await supabase.value
-    .from('rounds')
-    .select('*')
-    .eq('id', selectedRoundId.value)
-    .single()
-  if (rData) {
-    currentRound.value = rData
-    await fetchTeams()
-    await fetchAnswers()
-    setupAnswersSubscription()
-  }
-  loading.value = false
-}
-
-const fetchTeams = async () => {
-  if (!supabase.value || !selectedRoundId.value) return
-  const { data } = await supabase.value
-    .from('teams')
-    .select('*')
-    .eq('round_id', selectedRoundId.value)
-    .order('team_number', { ascending: true })
-  if (data) {
-    teams.value = data
-  }
-}
 
 const fetchAnswers = async () => {
   if (!supabase.value || teams.value.length === 0) return
@@ -288,41 +236,33 @@ const isQuestionCompleted = (qNum: number) => {
     return !!answersMap.value[`${t.id}-${qNum}`]
   })
 }
-
-const handleLogout = () => {
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem('staff_key')
-    localStorage.removeItem('admin_passkey')
-  }
-  router.push('/')
-}
 </script>
 
 <template>
   <div class="container mobile-view" v-if="passkeyValid">
     
     <!-- Header -->
-    <div style="margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+    <div class="staff-header-row">
       <div>
-        <h1 style="font-size: 1.8rem; background: linear-gradient(135deg, var(--color-cyan), var(--color-purple)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0.25rem;">
+        <h1 class="staff-title">
           บันทึกคะแนนคำตอบ
         </h1>
-        <p style="color: var(--text-secondary); font-size: 0.9rem;">
+        <p class="staff-subtitle">
           กรอกข้อมูลคำตอบจากกระดาษของทีมเข้าแข่ง
         </p>
       </div>
       
-      <button @click="handleLogout" class="btn btn-secondary" style="display: flex; align-items: center; gap: 0.25rem; padding: 0.5rem 0.75rem; font-size: 0.85rem;">
+      <button @click="logout" class="btn btn-secondary logout-btn">
         <LogOut :size="16" />
         <span>ออกจากระบบ</span>
       </button>
     </div>
 
     <!-- DB Warning -->
-    <div v-if="!isConfigured" style="text-align: center; padding: 4rem 1rem;" class="glass-card">
-      <AlertCircle :size="48" class="text-error" style="margin-bottom: 1rem;" />
-      <h2 style="font-size: 1.25rem; margin-bottom: 0.5rem;">ไม่ได้เชื่อมต่อฐานข้อมูล</h2>
-      <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+    <div v-if="!isConfigured" class="glass-card unconfigured-card">
+      <AlertCircle :size="48" class="text-error warning-icon" />
+      <h2 class="warning-title">ไม่ได้เชื่อมต่อฐานข้อมูล</h2>
+      <p class="warning-desc">
         กรุณาขอ URL และ API Key จากผู้จัดการแข่งขัน เพื่อตั้งค่าในหน้าแรก
       </p>
       <NuxtLink to="/" class="btn btn-primary">ไปหน้าตั้งค่าเชื่อมต่อ</NuxtLink>
@@ -331,43 +271,42 @@ const handleLogout = () => {
     <template v-else>
       
       <!-- Top Configurations / Filter Bar -->
-      <div class="glass-card" style="padding: 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
-        <div style="display: flex; gap: 0.5rem; width: 100%;">
-          <select v-model="selectedRoundId" @change="handleRoundChange" class="form-input" style="flex: 1;">
+      <div class="glass-card config-bar">
+        <div class="controls-row">
+          <select v-model="selectedRoundId" @change="handleRoundChange" class="form-input select-round">
             <option v-for="r in roundsList" :key="r.id" :value="r.id">{{ r.name }}</option>
           </select>
           
-          <button @click="showFilterModal = true" class="btn btn-secondary" style="padding: 0.75rem; border-radius: var(--radius-sm);">
-            <Filter :size="18" :style="filterMode === 'custom' ? 'color: var(--color-cyan);' : ''" />
+          <button @click="showFilterModal = true" class="btn btn-secondary filter-toggle-btn">
+            <Filter :size="18" :class="{ 'text-cyan-active': filterMode === 'custom' }" />
           </button>
         </div>
 
-        <div style="display: block; width: 100%;">
+        <div class="name-input-row">
           <input 
             v-model="staffName" 
             type="text" 
             class="form-input" 
             placeholder="ชื่อผู้บันทึก (เช่น Staff A)" 
-            style="font-size: 0.9rem; padding: 0.5rem 0.75rem;"
           />
         </div>
         
-        <div style="text-align: right;">
-          <span style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">
+        <div class="status-summary">
+          <span class="summary-text">
             {{ filterMode === 'all' ? 'กำลังบันทึก: ทุกทีม' : `กำลังบันทึก: ${filteredTeams.length} ทีม` }}
           </span>
         </div>
       </div>
 
       <!-- Question Selector (Horizontal Slider) -->
-      <div style="margin-bottom: 1.25rem;">
-        <div style="font-family: var(--font-title); font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 0.25rem; display: flex; justify-content: space-between;">
+      <div class="question-selector-section">
+        <div class="selector-header">
           <span>เลือกข้อคำถาม:</span>
-          <span style="color: var(--color-cyan);">ข้อที่ {{ selectedQuestion }}</span>
+          <span class="active-question-label">ข้อที่ {{ selectedQuestion }}</span>
         </div>
         <div class="question-selector">
           <div 
-            v-for="i in 20" 
+            v-for="i in TOTAL_QUESTIONS" 
             :key="i"
             @click="selectedQuestion = i"
             class="q-chip"
@@ -383,14 +322,14 @@ const handleLogout = () => {
       </div>
 
       <!-- Teams Input List -->
-      <div v-if="loading" style="text-align: center; color: var(--text-secondary); padding: 4rem;">
+      <div v-if="loading" class="loading-state">
         กำลังโหลดข้อมูลทีม...
       </div>
 
-      <div v-else-if="filteredTeams.length === 0" style="text-align: center; padding: 4rem 1rem;" class="glass-card">
-        <Users :size="48" style="color: var(--text-muted); margin-bottom: 1rem;" />
-        <h2 style="font-size: 1.15rem; margin-bottom: 0.5rem;">ยังไม่มีทีมในรายการดูแล</h2>
-        <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1.5rem;">
+      <div v-else-if="filteredTeams.length === 0" class="glass-card empty-teams-card">
+        <Users :size="48" class="prompt-icon" />
+        <h2 class="empty-title">ยังไม่มีทีมในรายการดูแล</h2>
+        <p class="empty-desc">
           กรุณากดปุ่มตัวกรองขวาบน เพื่อเลือกทีมที่คุณรับผิดชอบคะแนน (6-7 ทีม)
         </p>
         <button @click="showFilterModal = true" class="btn btn-primary">เลือกทีมดูแล</button>
@@ -403,25 +342,25 @@ const handleLogout = () => {
           class="team-entry-card"
         >
           <div class="team-entry-info">
-            <span style="font-weight: 700; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
-              <span style="color: var(--color-cyan); font-family: var(--font-title);">
+            <span class="team-identity">
+              <span class="team-number-badge">
                 {{ String(team.team_number).padStart(2, '0') }}
               </span>
               <span>{{ team.name }}</span>
             </span>
 
             <!-- Status Indicator -->
-            <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.25rem;">
+            <div class="save-status-indicator">
               <template v-if="savingStatus[`${team.id}-${selectedQuestion}`] === 'saving'">
-                <span class="loading-spin" style="display: inline-block; width: 10px; height: 10px; border: 2px solid var(--color-cyan); border-top-color: transparent; border-radius: 50%;"></span>
+                <span class="loading-spin small-spin"></span>
                 <span>กำลังบันทึก...</span>
               </template>
               <template v-else-if="savingStatus[`${team.id}-${selectedQuestion}`] === 'saved'">
-                <CheckCircle :size="12" style="color: var(--color-success);" />
-                <span style="color: var(--color-success);">บันทึกแล้ว</span>
+                <CheckCircle :size="12" class="text-success" />
+                <span class="text-success font-semibold">บันทึกแล้ว</span>
               </template>
               <template v-else-if="answersMap[`${team.id}-${selectedQuestion}`]">
-                <CheckCircle :size="12" style="color: var(--text-muted);" />
+                <CheckCircle :size="12" class="text-muted" />
                 <span>บันทึกแล้ว</span>
               </template>
               <template v-else>
@@ -446,66 +385,63 @@ const handleLogout = () => {
       </div>
 
       <!-- Filter Selection Overlay Modal -->
-      <div v-if="showFilterModal" class="no-print" style="position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem;">
-        <div class="glass-card" style="width: 100%; max-width: 500px; max-height: 90vh; display: flex; flex-direction: column; border-color: var(--glass-border-glow);">
+      <div v-if="showFilterModal" class="no-print modal-backdrop">
+        <div class="glass-card modal-card">
           
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.75rem;">
-            <h3 style="font-size: 1.2rem; display: flex; align-items: center; gap: 0.5rem;">
-              <Filter class="text-cyan" :size="20" />
+          <div class="modal-header">
+            <h3 class="modal-title">
+              <Filter class="text-cyan modal-header-icon" :size="20" />
               <span>เลือกทีมที่คุณรับผิดชอบ</span>
             </h3>
-            <button @click="showFilterModal = false" class="btn" style="padding: 0.25rem 0.5rem; background: none; border: none; font-size: 1.5rem;">&times;</button>
+            <button @click="showFilterModal = false" class="close-btn">&times;</button>
           </div>
 
-          <div style="margin-bottom: 1.5rem; display: flex; gap: 0.5rem;">
+          <div class="modal-tabs">
             <button 
               @click="filterMode = 'all'" 
-              class="btn" 
+              class="btn tab-btn" 
               :class="filterMode === 'all' ? 'btn-primary' : 'btn-secondary'"
-              style="flex: 1;"
             >
               ดูแลทุกทีม ({{ teams.length }})
             </button>
             <button 
               @click="filterMode = 'custom'" 
-              class="btn" 
+              class="btn tab-btn" 
               :class="filterMode === 'custom' ? 'btn-primary' : 'btn-secondary'"
-              style="flex: 1;"
             >
               เลือกเฉพาะบางทีม
             </button>
           </div>
 
           <!-- Custom selection grid -->
-          <div v-if="filterMode === 'custom'" style="flex: 1; overflow-y: auto; margin-bottom: 1.5rem; padding-right: 0.5rem;">
-            <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          <div v-if="filterMode === 'custom'" class="selection-scroll-container">
+            <p class="selection-desc">
               ทำเครื่องหมายเลือก 6-7 ทีมที่คุณต้องทำหน้าที่กรอกข้อมูล:
             </p>
-            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+            <div class="selection-list">
               <div 
                 v-for="t in teams" 
                 :key="t.id"
                 @click="toggleCustomTeam(t.id)"
-                class="glass-card"
+                class="glass-card team-selection-item"
                 :class="{ active: customTeamIds.includes(t.id) }"
-                style="padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between; cursor: pointer; background: rgba(255,255,255,0.01);"
               >
-                <span style="font-weight: 600; display: flex; align-items: center; gap: 0.5rem;">
-                  <span style="color: var(--color-cyan); font-family: var(--font-title);">{{ String(t.team_number).padStart(2, '0') }}</span>
+                <span class="selection-team-label">
+                  <span class="text-cyan font-bold">{{ String(t.team_number).padStart(2, '0') }}</span>
                   <span>{{ t.name }}</span>
                 </span>
                 
                 <input 
                   type="checkbox" 
                   :checked="customTeamIds.includes(t.id)"
-                  style="width: 18px; height: 18px; accent-color: var(--color-cyan); cursor: pointer;"
+                  class="selection-checkbox"
                   @click.stop="toggleCustomTeam(t.id)"
                 />
               </div>
             </div>
           </div>
 
-          <button @click="showFilterModal = false" class="btn btn-primary" style="width: 100%;">
+          <button @click="showFilterModal = false" class="btn btn-primary save-filter-btn">
             ตกลง (บันทึกตัวกรอง)
           </button>
 
@@ -517,28 +453,298 @@ const handleLogout = () => {
 </template>
 
 <style scoped>
-.text-cyan {
+.staff-header-row {
+  margin-bottom: 1.5rem; 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  gap: 1rem;
+}
+
+.staff-title {
+  font-size: 1.8rem; 
+  background: linear-gradient(135deg, var(--color-cyan), var(--color-purple)); 
+  -webkit-background-clip: text; 
+  -webkit-text-fill-color: transparent; 
+  margin-bottom: 0.25rem;
+}
+
+.staff-subtitle {
+  color: var(--text-secondary); 
+  font-size: 0.9rem;
+}
+
+.logout-btn {
+  display: flex; 
+  align-items: center; 
+  gap: 0.25rem; 
+  padding: 0.5rem 0.75rem; 
+  font-size: 0.85rem;
+}
+
+.text-error { color: var(--color-error); }
+.text-cyan { color: var(--color-cyan); }
+.text-success { color: var(--color-success); }
+.text-muted { color: var(--text-muted); }
+
+.warning-icon {
+  margin-bottom: 1rem;
+}
+
+.unconfigured-card {
+  text-align: center; 
+  padding: 4rem 1rem;
+}
+
+.warning-title {
+  font-size: 1.25rem; 
+  margin-bottom: 0.5rem;
+}
+
+.warning-desc {
+  color: var(--text-secondary); 
+  margin-bottom: 1.5rem;
+}
+
+.config-bar {
+  padding: 1rem; 
+  margin-bottom: 1rem; 
+  display: flex; 
+  flex-direction: column; 
+  gap: 0.75rem;
+}
+
+.controls-row {
+  display: flex; 
+  gap: 0.5rem; 
+  width: 100%;
+}
+
+.select-round {
+  flex: 1;
+}
+
+.filter-toggle-btn {
+  padding: 0.75rem; 
+  border-radius: var(--radius-sm);
+}
+
+.text-cyan-active {
   color: var(--color-cyan);
 }
-.text-error {
-  color: var(--color-error);
+
+.name-input-row {
+  display: block; 
+  width: 100%;
 }
-.text-success {
-  color: var(--color-success);
+
+.status-summary {
+  text-align: right;
 }
-.text-muted {
-  color: var(--text-muted);
+
+.summary-text {
+  font-size: 0.8rem; 
+  color: var(--text-muted); 
+  white-space: nowrap;
 }
-.glass-card.active {
-  border-color: var(--color-cyan);
-  background: rgba(0, 229, 255, 0.05) !important;
+
+.question-selector-section {
+  margin-bottom: 1.25rem;
+}
+
+.selector-header {
+  font-family: var(--font-title); 
+  font-size: 0.85rem; 
+  font-weight: 700; 
+  color: var(--text-secondary); 
+  margin-bottom: 0.25rem; 
+  display: flex; 
+  justify-content: space-between;
+}
+
+.active-question-label {
+  color: var(--color-cyan);
+}
+
+.loading-state {
+  text-align: center; 
+  color: var(--text-secondary); 
+  padding: 4rem;
+}
+
+.empty-teams-card {
+  text-align: center; 
+  padding: 4rem 1rem;
+}
+
+.prompt-icon {
+  color: var(--text-muted); 
+  margin-bottom: 1rem;
+}
+
+.empty-title {
+  font-size: 1.15rem; 
+  margin-bottom: 0.5rem;
+}
+
+.empty-desc {
+  color: var(--text-secondary); 
+  font-size: 0.9rem; 
+  margin-bottom: 1.5rem;
+}
+
+.team-identity {
+  font-weight: 700; 
+  font-size: 1.1rem; 
+  display: flex; 
+  align-items: center; 
+  gap: 0.5rem;
+}
+
+.team-number-badge {
+  color: var(--color-cyan); 
+  font-family: var(--font-title);
+}
+
+.save-status-indicator {
+  font-size: 0.75rem; 
+  color: var(--text-muted); 
+  display: flex; 
+  align-items: center; 
+  gap: 0.25rem;
 }
 
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
-.loading-spin {
+
+.small-spin {
+  display: inline-block; 
+  width: 10px; 
+  height: 10px; 
+  border: 2px solid var(--color-cyan); 
+  border-top-color: transparent; 
+  border-radius: 50%;
   animation: spin 1s linear infinite;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.modal-backdrop {
+  position: fixed; 
+  inset: 0; 
+  background: rgba(0,0,0,0.85); 
+  backdrop-filter: blur(8px); 
+  z-index: 1000; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  padding: 1rem;
+}
+
+.modal-card {
+  width: 100%; 
+  max-width: 500px; 
+  max-height: 90vh; 
+  display: flex; 
+  flex-direction: column; 
+  border-color: var(--glass-border-glow);
+}
+
+.modal-header {
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  margin-bottom: 1.5rem; 
+  border-bottom: 1px solid var(--glass-border); 
+  padding-bottom: 0.75rem;
+}
+
+.modal-title {
+  font-size: 1.2rem; 
+  display: flex; 
+  align-items: center; 
+  gap: 0.5rem;
+}
+
+.modal-header-icon {
+  vertical-align: middle;
+}
+
+.close-btn {
+  padding: 0.25rem 0.5rem; 
+  background: none; 
+  border: none; 
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.modal-tabs {
+  display: flex; 
+  gap: 0.5rem; 
+  margin-bottom: 1.5rem;
+}
+
+.tab-btn {
+  flex: 1;
+}
+
+.selection-scroll-container {
+  flex: 1; 
+  overflow-y: auto; 
+  margin-bottom: 1.5rem; 
+  padding-right: 0.5rem;
+}
+
+.selection-desc {
+  font-size: 0.8rem; 
+  color: var(--text-secondary); 
+  margin-bottom: 1rem;
+}
+
+.selection-list {
+  display: flex; 
+  flex-direction: column; 
+  gap: 0.5rem;
+}
+
+.team-selection-item {
+  padding: 0.75rem 1rem; 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between; 
+  cursor: pointer; 
+  background: rgba(255,255,255,0.01);
+}
+
+.team-selection-item.active {
+  border-color: var(--color-cyan);
+  background: rgba(0, 229, 255, 0.05) !important;
+}
+
+.selection-team-label {
+  font-weight: 600; 
+  display: flex; 
+  align-items: center; 
+  gap: 0.5rem;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+.selection-checkbox {
+  width: 18px; 
+  height: 18px; 
+  accent-color: var(--color-cyan); 
+  cursor: pointer;
+}
+
+.save-filter-btn {
+  width: 100%;
 }
 </style>

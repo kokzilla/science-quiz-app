@@ -1,128 +1,65 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { useSupabase } from '~/composables/useSupabase'
+import { useAuth } from '~/composables/useAuth'
+import { useRoundSelector } from '~/composables/useRoundSelector'
+import { TOTAL_QUESTIONS } from '~/utils/constants'
 import { 
   BarChart3, 
   Printer, 
   Download, 
   Check, 
-  X, 
   AlertCircle,
   Award,
   Grid
 } from 'lucide-vue-next'
+import type { Team, Question, Answer } from '~/types'
 
 const route = useRoute()
-const router = useRouter()
 const { supabase, isConfigured } = useSupabase()
+const { validateStaffOrAdmin, logout } = useAuth()
 
-const selectedRoundId = ref('')
-const roundsList = ref<any[]>([])
-const currentRound = ref<any>(null)
-const teams = ref<any[]>([])
-const questions = ref<any[]>([])
-const answers = ref<any[]>([])
+const teams = ref<Team[]>([])
+const questions = ref<Question[]>([])
+const answers = ref<Answer[]>([])
 
 const loading = ref(true)
 const activeReportTab = ref<'rankings' | 'crosstab' | 'item-analysis'>('rankings')
 const passkeyValid = ref(false)
 
-onMounted(async () => {
-  if (typeof window !== 'undefined') {
-    const staffKey = localStorage.getItem('staff_key') || ''
-    const adminKey = localStorage.getItem('admin_passkey') || ''
-    
-    if (!staffKey && !adminKey) {
-      router.push('/')
-      return
-    }
-    
-    // Verify
-    let isValid = false
-    if (supabase.value) {
-      if (staffKey) {
-        const { data } = await supabase.value.rpc('validate_passkey', { p_role: 'staff', p_passkey: staffKey })
-        if (data) isValid = true
-      }
-      if (!isValid && adminKey) {
-        const { data } = await supabase.value.rpc('validate_passkey', { p_role: 'admin', p_passkey: adminKey })
-        if (data) isValid = true
-      }
-    }
-    
-    if (!isValid) {
-      router.push('/')
-      return
-    }
-    passkeyValid.value = true
-  }
-
-  if (isConfigured.value) {
-    fetchRounds()
-  }
-})
-
-watch(roundsList, () => {
-  if (roundsList.value.length > 0) {
-    const queryId = route.query.round as string
-    if (queryId && roundsList.value.some(r => r.id === queryId)) {
-      selectedRoundId.value = queryId
-    } else {
-      selectedRoundId.value = roundsList.value[0].id
-    }
-    handleRoundChange()
-  }
-})
-
-const fetchRounds = async () => {
-  if (!supabase.value) return
-  const { data } = await supabase.value
-    .from('rounds')
-    .select('*')
-    .order('created_at', { ascending: false })
-  if (data) {
-    roundsList.value = data
-  }
-}
-
-const handleRoundChange = async () => {
-  if (!supabase.value || !selectedRoundId.value) return
+// Callback when selected round changes
+const onRoundChanged = async (roundId: string) => {
+  if (!supabase.value || !roundId) return
   loading.value = true
   
   try {
-    // 1. Fetch round details
-    const { data: rData } = await supabase.value
-      .from('rounds')
-      .select('*')
-      .eq('id', selectedRoundId.value)
-      .single()
-    currentRound.value = rData
-
-    // 2. Fetch all teams
+    // 1. Fetch all teams
     const { data: tData } = await supabase.value
       .from('teams')
       .select('*')
-      .eq('round_id', selectedRoundId.value)
+      .eq('round_id', roundId)
       .order('team_number', { ascending: true })
-    teams.value = tData || []
+    teams.value = (tData || []) as Team[]
 
-    // 3. Fetch questions answer key
+    // 2. Fetch questions answer key
     const { data: qData } = await supabase.value
       .from('questions')
       .select('*')
-      .eq('round_id', selectedRoundId.value)
+      .eq('round_id', roundId)
       .order('question_number', { ascending: true })
-    questions.value = qData || []
+    questions.value = (qData || []) as Question[]
 
-    // 4. Fetch all answers
+    // 3. Fetch all answers
     if (teams.value.length > 0) {
       const teamIds = teams.value.map(t => t.id)
       const { data: aData } = await supabase.value
         .from('answers')
         .select('*')
         .in('team_id', teamIds)
-      answers.value = aData || []
+      answers.value = (aData || []) as Answer[]
+    } else {
+      answers.value = []
     }
   } catch (err) {
     console.error('Error fetching reports data:', err)
@@ -131,11 +68,25 @@ const handleRoundChange = async () => {
   }
 }
 
+// Using useRoundSelector composable
+const {
+  selectedRoundId,
+  roundsList,
+  currentRound,
+  handleRoundChange
+} = useRoundSelector(onRoundChanged)
+
+onMounted(async () => {
+  const isValid = await validateStaffOrAdmin()
+  if (!isValid) return
+  passkeyValid.value = true
+})
+
 // ==========================================
 // REPORT CALCULATIONS
 // ==========================================
 
-// 1. Leaderboard / Rankings calculation (Sums all 20 questions)
+// 1. Leaderboard / Rankings calculation (Sums all TOTAL_QUESTIONS questions)
 const rankings = computed(() => {
   if (teams.value.length === 0) return []
 
@@ -149,7 +100,7 @@ const rankings = computed(() => {
       return ans.team_id === team.id && ans.submitted_answer && !ans.is_correct
     }).length
 
-    const unansweredCount = 20 - (correctCount + wrongCount)
+    const unansweredCount = TOTAL_QUESTIONS - (correctCount + wrongCount)
     const finalScore = correctCount + team.tie_breaker_score
 
     return {
@@ -181,10 +132,10 @@ const rankings = computed(() => {
   })
 })
 
-// 2. Cross Table (Teams x Questions 1-20 grid)
+// 2. Cross Table (Teams x Questions 1-TOTAL_QUESTIONS grid)
 const crossTable = computed(() => {
   return teams.value.map(team => {
-    const qDetails = Array.from({ length: 20 }, (_, idx) => {
+    const qDetails = Array.from({ length: TOTAL_QUESTIONS }, (_, idx) => {
       const qNum = idx + 1
       const ansRow = answers.value.find(a => a.team_id === team.id && a.question_number === qNum)
       return {
@@ -209,7 +160,7 @@ const crossTable = computed(() => {
 const itemAnalysis = computed(() => {
   if (teams.value.length === 0) return []
 
-  return Array.from({ length: 20 }, (_, idx) => {
+  return Array.from({ length: TOTAL_QUESTIONS }, (_, idx) => {
     const qNum = idx + 1
     const qKey = questions.value.find(q => q.question_number === qNum)
     
@@ -258,7 +209,7 @@ const handleExportCSV = () => {
     })
   } else {
     // Cross table
-    csvContent += 'Team Number,Team Name,' + Array.from({ length: 20 }, (_, i) => `Q${i + 1}`).join(',') + ',Total Score\n'
+    csvContent += 'Team Number,Team Name,' + Array.from({ length: TOTAL_QUESTIONS }, (_, i) => `Q${i + 1}`).join(',') + ',Total Score\n'
     crossTable.value.forEach(row => {
       const qAnswers = row.questions.map(q => q.is_correct ? 'Correct' : q.answer ? `Incorrect(${q.answer})` : 'Unanswered').join(',')
       csvContent += `${row.team_number},"${row.name.replace(/"/g, '""')}",${qAnswers},${row.finalScore}\n`
@@ -279,15 +230,15 @@ const handleExportCSV = () => {
   <div class="container" v-if="passkeyValid">
     
     <!-- Top Configuration / Action Bar -->
-    <div class="glass-card no-print" style="margin-bottom: 2rem; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem;">
-      <div style="display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 280px;">
-        <label class="form-label" style="margin-bottom: 0; white-space: nowrap;">เลือกรอบรายงาน:</label>
-        <select v-model="selectedRoundId" @change="handleRoundChange" class="form-input" style="max-width: 320px;">
+    <div class="glass-card no-print action-bar">
+      <div class="selector-group">
+        <label class="form-label selector-label">เลือกรอบรายงาน:</label>
+        <select v-model="selectedRoundId" @change="handleRoundChange" class="form-input round-select">
           <option v-for="r in roundsList" :key="r.id" :value="r.id">{{ r.name }}</option>
         </select>
       </div>
 
-      <div style="display: flex; gap: 0.5rem;" v-if="currentRound">
+      <div class="buttons-group" v-if="currentRound">
         <button @click="handleExportCSV" class="btn btn-secondary">
           <Download :size="16" />
           <span>ส่งออกไฟล์ CSV</span>
@@ -297,14 +248,19 @@ const handleExportCSV = () => {
           <Printer :size="16" />
           <span>พิมพ์รายงาน (Print / Save PDF)</span>
         </button>
+        
+        <button @click="logout" class="btn btn-secondary logout-btn">
+          <LogOut :size="16" />
+          <span>ออกจากระบบ</span>
+        </button>
       </div>
     </div>
 
     <!-- Error/Unconfigured state -->
-    <div v-if="!isConfigured" style="text-align: center; padding: 4rem 1rem;" class="glass-card">
-      <AlertCircle :size="48" class="text-error" style="margin-bottom: 1rem;" />
-      <h2 style="font-size: 1.25rem; margin-bottom: 0.5rem;">ไม่ได้เชื่อมต่อฐานข้อมูล</h2>
-      <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+    <div v-if="!isConfigured" class="glass-card unconfigured-card">
+      <AlertCircle :size="48" class="text-error warning-icon" />
+      <h2 class="warning-title">ไม่ได้เชื่อมต่อฐานข้อมูล</h2>
+      <p class="warning-desc">
         กรุณาเชื่อมต่อและใส่รหัสความปลอดภัยของฐานข้อมูลในหน้าแรกก่อน
       </p>
       <NuxtLink to="/" class="btn btn-primary">ไปหน้าตั้งค่าเชื่อมต่อ</NuxtLink>
@@ -314,100 +270,96 @@ const handleExportCSV = () => {
     <template v-else-if="currentRound">
       
       <!-- Report Header (Print friendly) -->
-      <div style="text-align: center; margin-bottom: 2rem;">
-        <h1 style="font-size: 2.2rem; margin-bottom: 0.25rem; color: #fff;">รายงานผลการแข่งขันอย่างเป็นทางการ</h1>
-        <p style="color: var(--text-secondary); font-size: 1.05rem;">
-          {{ currentRound.name }} • วันที่แข่ง: {{ currentRound.date }}
+      <div class="report-header">
+        <h1 class="report-title">รายงานผลการแข่งขันอย่างเป็นทางการ</h1>
+        <p class="report-subtitle">
+          {{ currentRound.name }} • วันที่แข่ง: {{ currentRound.round_date || currentRound.date }}
         </p>
       </div>
 
       <!-- Report Tabs (No Print) -->
-      <div class="no-print" style="display: flex; border-bottom: 1px solid var(--glass-border); margin-bottom: 1.5rem; overflow-x: auto; gap: 0.5rem;">
+      <div class="no-print tabs-row">
         <button 
           @click="activeReportTab = 'rankings'" 
-          class="btn" 
-          :style="activeReportTab === 'rankings' ? 'border-bottom: 2px solid var(--color-cyan); color: var(--color-cyan); font-weight: 700;' : 'color: var(--text-secondary);'"
-          style="border-radius: 0; background: none; box-shadow: none;"
+          class="btn tab-btn" 
+          :class="{ active: activeReportTab === 'rankings' }"
         >
           <Award :size="16" />
-          สรุปทำเนียบผู้ชนะและอันดับ
+          <span>สรุปทำเนียบผู้ชนะและอันดับ</span>
         </button>
 
         <button 
           @click="activeReportTab = 'crosstab'" 
-          class="btn" 
-          :style="activeReportTab === 'crosstab' ? 'border-bottom: 2px solid var(--color-cyan); color: var(--color-cyan); font-weight: 700;' : 'color: var(--text-secondary);'"
-          style="border-radius: 0; background: none; box-shadow: none;"
+          class="btn tab-btn" 
+          :class="{ active: activeReportTab === 'crosstab' }"
         >
           <Grid :size="16" />
-          ตารางคะแนนแบบละเอียด (Cross Grid)
+          <span>ตารางคะแนนแบบละเอียด (Cross Grid)</span>
         </button>
 
         <button 
           @click="activeReportTab = 'item-analysis'" 
-          class="btn" 
-          :style="activeReportTab === 'item-analysis' ? 'border-bottom: 2px solid var(--color-cyan); color: var(--color-cyan); font-weight: 700;' : 'color: var(--text-secondary);'"
-          style="border-radius: 0; background: none; box-shadow: none;"
+          class="btn tab-btn" 
+          :class="{ active: activeReportTab === 'item-analysis' }"
         >
           <BarChart3 :size="16" />
-          สถิติวิเคราะห์ข้อสอบ (Item Analysis)
+          <span>สถิติวิเคราะห์ข้อสอบ (Item Analysis)</span>
         </button>
       </div>
 
       <!-- Loading State -->
-      <div v-if="loading" style="text-align: center; color: var(--text-secondary); padding: 5rem;">
+      <div v-if="loading" class="loading-state">
         กำลังรวบรวมข้อมูลสถิติ...
       </div>
 
-      <div v-else class="glass-card" style="background: rgba(255,255,255,0.015);">
+      <div v-else class="glass-card report-data-card">
         
         <!-- Tab 1: Leaderboard and Rankings -->
         <div v-if="activeReportTab === 'rankings'">
-          <h2 style="font-size: 1.3rem; margin-bottom: 1rem; color: var(--color-cyan);" class="no-print">ทำเนียบอันดับคะแนนรวม (ข้อ 1-20)</h2>
+          <h2 class="section-title no-print">ทำเนียบอันดับคะแนนรวม (ข้อ 1-{{ TOTAL_QUESTIONS }})</h2>
           
           <div class="table-responsive">
             <table class="report-table">
               <thead>
                 <tr>
-                  <th style="width: 80px;">อันดับ</th>
-                  <th style="width: 100px;">เลขประจำทีม</th>
+                  <th class="rank-col">อันดับ</th>
+                  <th class="team-col">เลขประจำทีม</th>
                   <th>ชื่อทีม / สังกัดโรงเรียน</th>
-                  <th style="text-align: center;">ตอบถูก (ข้อ)</th>
-                  <th style="text-align: center;">ตอบผิด (ข้อ)</th>
-                  <th style="text-align: center;">ไม่ตอบ (ข้อ)</th>
-                  <th style="text-align: center; width: 140px;">คะแนนไทเบรกเกอร์</th>
-                  <th style="text-align: right; width: 120px; font-weight: 800;">คะแนนรวมสุทธิ</th>
+                  <th class="center-text">ตอบถูก (ข้อ)</th>
+                  <th class="center-text">ตอบผิด (ข้อ)</th>
+                  <th class="center-text">ไม่ตอบ (ข้อ)</th>
+                  <th class="center-text tiebreak-score-col">คะแนนไทเบรกเกอร์</th>
+                  <th class="right-text total-score-col">คะแนนรวมสุทธิ</th>
                 </tr>
               </thead>
               <tbody>
                 <tr 
                   v-for="row in rankings" 
                   :key="row.id"
-                  :style="row.rank <= 3 ? 'background: rgba(255, 255, 255, 0.02);' : ''"
+                  :class="{ 'rank-highlight': row.rank <= 3 }"
                 >
                   <td>
                     <span 
                       v-if="row.rank <= 3" 
-                      class="status-pill"
+                      class="status-pill rank-pill"
                       :class="row.rank === 1 ? 'active' : row.rank === 2 ? 'completed' : 'pending'"
-                      style="font-family: var(--font-title); font-weight: 800;"
                       :style="row.rank === 1 ? 'background: rgba(255, 214, 0, 0.2); color: var(--color-gold);' : ''"
                     >
                       อันดับ {{ row.rank }}
                     </span>
-                    <span v-else style="font-family: var(--font-title); font-weight: 600; padding-left: 0.6rem;">
+                    <span v-else class="regular-rank">
                       {{ row.rank }}
                     </span>
                   </td>
-                  <td style="font-family: var(--font-title); color: var(--color-cyan); font-weight: 700;">
-                    {{ String(row.team_number).padStart(2, '0') }}
+                  <td class="team-number-highlight">
+                    {{ String(team_number).padStart(2, '0') || String(row.team_number).padStart(2, '0') }}
                   </td>
-                  <td style="font-weight: 600;">{{ row.name }}</td>
-                  <td style="text-align: center; color: var(--color-success); font-weight: 700;">{{ row.correctCount }}</td>
-                  <td style="text-align: center; color: var(--color-error);">{{ row.wrongCount }}</td>
-                  <td style="text-align: center; color: var(--text-muted);">{{ row.unansweredCount }}</td>
-                  <td style="text-align: center; color: var(--color-gold); font-weight: 700;">{{ row.tie_breaker_score }}</td>
-                  <td style="text-align: right; font-family: var(--font-title); font-weight: 800; font-size: 1.25rem; color: #fff;">
+                  <td class="team-name-bold">{{ row.name }}</td>
+                  <td class="center-text text-success font-bold">{{ row.correctCount }}</td>
+                  <td class="center-text text-error">{{ row.wrongCount }}</td>
+                  <td class="center-text text-muted">{{ row.unansweredCount }}</td>
+                  <td class="center-text text-gold font-bold">{{ row.tie_breaker_score }}</td>
+                  <td class="right-text final-score-cell">
                     {{ row.finalScore }}
                   </td>
                 </tr>
@@ -418,47 +370,47 @@ const handleExportCSV = () => {
 
         <!-- Tab 2: Detailed Cross-Grid Table -->
         <div v-if="activeReportTab === 'crosstab'">
-          <h2 style="font-size: 1.3rem; margin-bottom: 0.5rem; color: var(--color-cyan);" class="no-print">ตารางวิเคราะห์คำตอบรายข้อแบบละเอียด</h2>
-          <p style="color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 1.5rem;" class="no-print">
-            สัญลักษณ์: <span style="color: var(--color-success);">✓ (ตอบถูก)</span>, <span style="color: var(--color-error);">X (ตอบผิด)</span>, <span style="color: var(--text-muted);">- (ไม่บันทึกคำตอบ)</span>
+          <h2 class="section-title no-print">ตารางวิเคราะห์คำตอบรายข้อแบบละเอียด</h2>
+          <p class="section-desc no-print">
+            สัญลักษณ์: <span class="text-success">✓ (ตอบถูก)</span>, <span class="text-error">X (ตอบผิด)</span>, <span class="text-muted">- (ไม่บันทึกคำตอบ)</span>
           </p>
 
           <div class="table-responsive">
-            <table class="report-table" style="font-size: 0.85rem;">
+            <table class="report-table crosstab-table">
               <thead>
                 <tr>
-                  <th style="width: 50px;">เลขทีม</th>
-                  <th style="min-width: 180px;">ชื่อทีม</th>
+                  <th class="crosstab-team-col">เลขทีม</th>
+                  <th class="crosstab-name-col">ชื่อทีม</th>
                   <th 
-                    v-for="i in 20" 
+                    v-for="i in TOTAL_QUESTIONS" 
                     :key="i" 
-                    style="width: 38px; text-align: center; padding: 0.5rem 0.25rem; font-family: var(--font-title);"
+                    class="crosstab-q-header"
                   >
                     Q{{ i }}
                   </th>
-                  <th style="text-align: right; font-weight: 700; width: 60px;">คะแนน</th>
+                  <th class="right-text crosstab-score-col">คะแนน</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="row in crossTable" :key="row.id">
-                  <td style="font-family: var(--font-title); font-weight: 700; color: var(--color-cyan);">
+                  <td class="team-number-highlight">
                     {{ String(row.team_number).padStart(2, '0') }}
                   </td>
-                  <td style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  <td class="team-name-ellipsis">
                     {{ row.name }}
                   </td>
                   <td 
                     v-for="(qDetail, idx) in row.questions" 
                     :key="idx"
-                    style="text-align: center; padding: 0.5rem 0.15rem;"
+                    class="crosstab-cell"
                   >
-                    <Check v-if="qDetail.submitted && qDetail.is_correct" :size="14" style="color: var(--color-success); margin: 0 auto;" />
-                    <span v-else-if="qDetail.submitted" style="color: var(--color-error); font-weight: 700;">
+                    <Check v-if="qDetail.submitted && qDetail.is_correct" :size="14" class="text-success centered-icon" />
+                    <span v-else-if="qDetail.submitted" class="text-error font-bold">
                       {{ qDetail.answer }}
                     </span>
-                    <span v-else style="color: var(--text-muted);">-</span>
+                    <span v-else class="text-muted">-</span>
                   </td>
-                  <td style="text-align: right; font-family: var(--font-title); font-weight: 800; font-size: 1.1rem; color: #fff;">
+                  <td class="right-text final-score-bold">
                     {{ row.finalScore }}
                   </td>
                 </tr>
@@ -469,34 +421,40 @@ const handleExportCSV = () => {
 
         <!-- Tab 3: Item Analysis -->
         <div v-if="activeReportTab === 'item-analysis'">
-          <h2 style="font-size: 1.3rem; margin-bottom: 1rem; color: var(--color-cyan);" class="no-print">สถิติวิเคราะห์รายข้อ (ข้อคำถามที่ 1 - 20)</h2>
+          <h2 class="section-title no-print">สถิติวิเคราะห์รายข้อ (ข้อคำถามที่ 1 - {{ TOTAL_QUESTIONS }})</h2>
           
           <div class="table-responsive">
             <table class="report-table">
               <thead>
                 <tr>
-                  <th style="width: 100px;">ข้อที่</th>
-                  <th style="width: 140px; text-align: center;">เฉลยที่ถูกต้อง</th>
-                  <th style="text-align: center;">จำนวนตอบถูก (ทีม)</th>
-                  <th style="text-align: center;">จำนวนตอบผิด (ทีม)</th>
-                  <th style="text-align: center;">จำนวนไม่ตอบ (ทีม)</th>
-                  <th style="text-align: right; font-weight: 700;">เปอร์เซ็นต์ตอบถูก</th>
+                  <th class="q-num-col">ข้อที่</th>
+                  <th class="correct-choice-col">เฉลยที่ถูกต้อง</th>
+                  <th class="center-text">จำนวนตอบถูก (ทีม)</th>
+                  <th class="center-text">จำนวนตอบผิด (ทีม)</th>
+                  <th class="center-text">จำนวนไม่ตอบ (ทีม)</th>
+                  <th class="right-text">เปอร์เซ็นต์ตอบถูก</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="row in itemAnalysis" :key="row.question_number">
-                  <td style="font-family: var(--font-title); font-weight: 700; color: var(--color-cyan);">
+                  <td class="team-number-highlight">
                     ข้อที่ {{ String(row.question_number).padStart(2, '0') }}
                   </td>
-                  <td style="text-align: center;">
-                    <span class="status-pill completed" style="background: rgba(0, 229, 255, 0.15); font-weight: 800; padding: 0.25rem 0.8rem; font-size: 0.95rem;">
+                  <td class="center-text">
+                    <span class="status-pill completed answer-key-pill">
                       {{ row.correct_answer }}
                     </span>
                   </td>
-                  <td style="text-align: center; color: var(--color-success); font-weight: 600;">{{ row.correctCount }}</td>
-                  <td style="text-align: center; color: var(--color-error);">{{ row.wrongCount }}</td>
-                  <td style="text-align: center; color: var(--text-muted);">{{ row.unansweredCount }}</td>
-                  <td style="text-align: right; font-family: var(--font-title); font-weight: 800; font-size: 1.15rem;" :style="row.correctPercent >= 80 ? 'color: var(--color-success);' : row.correctPercent <= 30 ? 'color: var(--color-error);' : 'color: #fff;'">
+                  <td class="center-text text-success font-semibold">{{ row.correctCount }}</td>
+                  <td class="center-text text-error">{{ row.wrongCount }}</td>
+                  <td class="center-text text-muted">{{ row.unansweredCount }}</td>
+                  <td 
+                    class="right-text percentage-cell" 
+                    :class="{ 
+                      'high-correct': row.correctPercent >= 80, 
+                      'low-correct': row.correctPercent <= 30 
+                    }"
+                  >
                     {{ row.correctPercent }}%
                   </td>
                 </tr>
@@ -511,7 +469,224 @@ const handleExportCSV = () => {
 </template>
 
 <style scoped>
-.text-error {
-  color: var(--color-error);
+.action-bar {
+  margin-bottom: 2rem; 
+  display: flex; 
+  flex-wrap: wrap; 
+  justify-content: space-between; 
+  align-items: center; 
+  gap: 1rem;
+}
+
+.selector-group {
+  display: flex; 
+  align-items: center; 
+  gap: 1rem; 
+  flex: 1; 
+  min-width: 280px;
+}
+
+.selector-label {
+  margin-bottom: 0; 
+  white-space: nowrap;
+}
+
+.round-select {
+  max-width: 320px;
+}
+
+.buttons-group {
+  display: flex; 
+  gap: 0.5rem;
+}
+
+.logout-btn {
+  display: flex; 
+  align-items: center; 
+  gap: 0.25rem;
+}
+
+.text-error { color: var(--color-error); }
+.text-cyan { color: var(--color-cyan); }
+.text-gold { color: var(--color-gold); }
+.text-success { color: var(--color-success); }
+.text-muted { color: var(--text-muted); }
+.font-bold { font-weight: 700; }
+.font-semibold { font-weight: 600; }
+
+.warning-icon {
+  margin-bottom: 1rem;
+}
+
+.unconfigured-card {
+  text-align: center; 
+  padding: 4rem 1rem;
+}
+
+.warning-title {
+  font-size: 1.25rem; 
+  margin-bottom: 0.5rem;
+}
+
+.warning-desc {
+  color: var(--text-secondary); 
+  margin-bottom: 1.5rem;
+}
+
+.report-header {
+  text-align: center; 
+  margin-bottom: 2rem;
+}
+
+.report-title {
+  font-size: 2.2rem; 
+  margin-bottom: 0.25rem; 
+  color: #fff;
+}
+
+.report-subtitle {
+  color: var(--text-secondary); 
+  font-size: 1.05rem;
+}
+
+.tabs-row {
+  display: flex; 
+  border-bottom: 1px solid var(--glass-border); 
+  margin-bottom: 1.5rem; 
+  overflow-x: auto; 
+  gap: 0.5rem;
+}
+
+.tab-btn {
+  border-radius: 0; 
+  background: none; 
+  box-shadow: none;
+  color: var(--text-secondary);
+}
+
+.tab-btn.active {
+  border-bottom: 2px solid var(--color-cyan); 
+  color: var(--color-cyan) !important; 
+  font-weight: 700;
+}
+
+.loading-state {
+  text-align: center; 
+  color: var(--text-secondary); 
+  padding: 5rem;
+}
+
+.report-data-card {
+  background: rgba(255,255,255,0.015);
+}
+
+.section-title {
+  font-size: 1.3rem; 
+  margin-bottom: 1rem; 
+  color: var(--color-cyan);
+}
+
+.section-desc {
+  color: var(--text-secondary); 
+  font-size: 0.8rem; 
+  margin-bottom: 1.5rem;
+}
+
+.rank-col { width: 80px; }
+.team-col { width: 100px; }
+.center-text { text-align: center; }
+.right-text { text-align: right; }
+.tiebreak-score-col { width: 140px; }
+.total-score-col { width: 120px; font-weight: 800; }
+
+.rank-highlight {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.rank-pill {
+  font-family: var(--font-title); 
+  font-weight: 800;
+}
+
+.regular-rank {
+  font-family: var(--font-title); 
+  font-weight: 600; 
+  padding-left: 0.6rem;
+}
+
+.team-number-highlight {
+  font-family: var(--font-title); 
+  color: var(--color-cyan); 
+  font-weight: 700;
+}
+
+.team-name-bold {
+  font-weight: 600;
+}
+
+.final-score-cell {
+  font-family: var(--font-title); 
+  font-weight: 800; 
+  font-size: 1.25rem; 
+  color: #fff;
+}
+
+.crosstab-team-col { width: 50px; }
+.crosstab-name-col { min-width: 180px; }
+.crosstab-score-col { font-weight: 700; width: 60px; }
+
+.crosstab-q-header {
+  width: 38px; 
+  text-align: center; 
+  padding: 0.5rem 0.25rem; 
+  font-family: var(--font-title);
+}
+
+.team-name-ellipsis {
+  font-weight: 600; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  white-space: nowrap;
+}
+
+.crosstab-cell {
+  text-align: center; 
+  padding: 0.5rem 0.15rem;
+}
+
+.centered-icon {
+  margin: 0 auto;
+}
+
+.final-score-bold {
+  font-family: var(--font-title); 
+  font-weight: 800; 
+  font-size: 1.1rem; 
+  color: #fff;
+}
+
+.q-num-col { width: 100px; }
+.correct-choice-col { width: 140px; text-align: center; }
+
+.answer-key-pill {
+  background: rgba(0, 229, 255, 0.15); 
+  font-weight: 800; 
+  padding: 0.25rem 0.8rem; 
+  font-size: 0.95rem;
+}
+
+.percentage-cell {
+  font-family: var(--font-title); 
+  font-weight: 800; 
+  font-size: 1.15rem; 
+  color: #fff;
+}
+
+.high-correct {
+  color: var(--color-success) !important;
+}
+
+.low-correct {
+  color: var(--color-error) !important;
 }
 </style>

@@ -462,7 +462,8 @@ const startLocalSampleTimer = () => {
   
   const updateTimer = () => {
     const now = Date.now()
-    const elapsed = Math.floor((now - startedAt) / 1000)
+    // Countdown 2x faster: count elapsed in half-seconds (500ms)
+    const elapsed = Math.floor((now - startedAt) / 500)
     const remaining = Math.max(0, 30 - elapsed)
     
     timerRemaining.value = remaining
@@ -607,47 +608,38 @@ const handlePageClick = () => {
     <!-- Configuration selector (no-print floating top right for testing) -->
     <div class="no-print" style="position: absolute; top: 1rem; right: 1rem; display: flex; gap: 0.5rem; align-items: center; z-index: 99;">
       
-      <!-- Thai Voice Status Badge -->
+      <!-- Compact Circular Thai Voice Status Badge -->
       <div 
         v-if="!hasThaiVoice" 
-        style="background: rgba(255, 23, 68, 0.15); border: 1px solid rgba(255, 23, 68, 0.3); color: #ff5252; padding: 0.35rem 0.85rem; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem; font-weight: 600; box-shadow: 0 0 10px rgba(255, 82, 82, 0.1);"
-        title="เบราว์เซอร์นี้ไม่มีเสียงภาษาไทยติดตั้งไว้ หรือเสียงกำลังโหลด (แนะนำให้เปิดด้วย Microsoft Edge)"
+        style="background: rgba(255, 23, 68, 0.2); border: 1px solid rgba(255, 23, 68, 0.4); color: #ff5252; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.75rem; box-shadow: 0 0 10px rgba(255, 82, 82, 0.15);"
+        title="ไม่พบเสียงสังเคราะห์ภาษาไทย (แนะนำให้เปิดด้วย Microsoft Edge)"
       >
-        <span style="width: 8px; height: 8px; background: #ff5252; border-radius: 50%; display: inline-block; animation: pulseRed 1.2s infinite alternate;"></span>
-        <span>ไม่พบเสียงภาษาไทย (แนะนำใช้ Edge)</span>
+        TH
       </div>
       <div 
         v-else 
-        style="background: rgba(0, 230, 118, 0.1); border: 1px solid rgba(0, 230, 118, 0.25); color: #00e676; padding: 0.35rem 0.85rem; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 0.4rem; font-weight: 600;"
+        style="background: rgba(0, 230, 118, 0.15); border: 1px solid rgba(0, 230, 118, 0.3); color: #00e676; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.75rem;"
         title="เสียงสังเคราะห์ภาษาไทยพร้อมใช้งาน"
       >
-        <span style="width: 8px; height: 8px; background: #00e676; border-radius: 50%; display: inline-block;"></span>
-        <span>เสียงภาษาไทยพร้อมใช้งาน</span>
+        TH
       </div>
 
       <button 
         @click="ttsEnabled = !ttsEnabled" 
         class="btn btn-secondary" 
-        style="padding: 0.5rem; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center;"
+        style="padding: 0.5rem; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;"
         :title="ttsEnabled ? 'ปิดระบบเสียงอ่านเลขทีมตอบถูก' : 'เปิดระบบเสียงอ่านเลขทีมตอบถูก'"
       >
-        <Mic v-if="ttsEnabled" :size="18" class="text-cyan" />
-        <MicOff v-else :size="18" style="color: var(--text-muted);" />
+        <Mic v-if="ttsEnabled" :size="16" class="text-cyan" />
+        <MicOff v-else :size="16" style="color: var(--text-muted);" />
       </button>
 
-      <button @click="soundEnabled = !soundEnabled" class="btn btn-secondary" style="padding: 0.5rem; border-radius: 50%; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center;">
-        <Volume2 v-if="soundEnabled" :size="18" />
-        <VolumeX v-else :size="18" style="color: var(--text-muted);" />
+      <button @click="soundEnabled = !soundEnabled" class="btn btn-secondary" style="padding: 0.5rem; border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;">
+        <Volume2 v-if="soundEnabled" :size="16" />
+        <VolumeX v-else :size="16" style="color: var(--text-muted);" />
       </button>
 
-      <div style="background: rgba(0,0,0,0.5); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; display: flex; align-items: center; gap: 0.5rem; border: 1px solid var(--glass-border);">
-        <span>รอบการแข่ง:</span>
-        <select v-model="selectedRoundId" @change="handleRoundChange" style="background: var(--bg-tertiary); color: var(--text-primary); border: none; font-size: 0.75rem; border-radius: 4px; padding: 0.2rem 0.5rem; outline: none; cursor: pointer; max-width: 140px;">
-          <option v-for="r in roundsList" :key="r.id" :value="r.id" style="color: var(--text-primary); background: var(--bg-secondary);">
-            {{ r.name }}
-          </option>
-        </select>
-      </div>
+      <!-- Hide round selector as requested -->
     </div>
 
     <!-- Error States -->

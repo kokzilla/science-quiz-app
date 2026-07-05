@@ -691,43 +691,7 @@ button, input, select, textarea {
   justify-content: center;
 }
 
-/* Responsive Navigation */
-@media (max-width: 1024px) {
-  .navbar {
-    padding: 0.75rem 1rem !important;
-  }
-  .nav-container {
-    flex-direction: column !important;
-    gap: 0.75rem !important;
-    align-items: center !important;
-  }
-  .nav-links {
-    gap: 0.4rem !important;
-    width: 100% !important;
-    justify-content: center !important;
-    flex-wrap: wrap !important;
-  }
-  .nav-link {
-    font-size: 0.85rem !important;
-    padding: 0.4rem 0.6rem !important;
-  }
-}
 
-@media (max-width: 640px) {
-  .navbar {
-    padding: 0.5rem !important;
-  }
-  .logo {
-    font-size: 1.25rem !important;
-  }
-  .nav-links {
-    gap: 0.2rem !important;
-  }
-  .nav-link {
-    font-size: 0.78rem !important;
-    padding: 0.35rem 0.5rem !important;
-  }
-}
 
 @media print {
   body {
