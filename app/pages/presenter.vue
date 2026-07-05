@@ -47,6 +47,7 @@ let configChannel: any = null
 
 // Question Intro state
 const showQuestionIntro = ref(false)
+const isFetchingQuestion = ref(false)
 let introTimeout: any = null
 let speakTimeout: any = null
 let correctTeamsSpeakTimeout: any = null
@@ -157,17 +158,22 @@ const loadPresentationState = async () => {
 
 const fetchActiveQuestion = async (qNum: number) => {
   if (!supabase.value || !selectedRoundId.value) return
-  const { data } = await supabase.value
-    .from('questions')
-    .select('*')
-    .eq('round_id', selectedRoundId.value)
-    .eq('question_number', qNum)
-    .maybeSingle()
-  
-  question.value = data || null
-  
-  if (currentRound.value?.presenter_show_state === 'correct_teams') {
-    await fetchCorrectTeams()
+  isFetchingQuestion.value = true
+  try {
+    const { data } = await supabase.value
+      .from('questions')
+      .select('*')
+      .eq('round_id', selectedRoundId.value)
+      .eq('question_number', qNum)
+      .maybeSingle()
+    
+    question.value = data || null
+    
+    if (currentRound.value?.presenter_show_state === 'correct_teams') {
+      await fetchCorrectTeams()
+    }
+  } finally {
+    isFetchingQuestion.value = false
   }
 }
 
@@ -286,15 +292,53 @@ const speakQuestionStart = (qNum: number) => {
   }, 150)
 }
 
+let activeIntroUnwatch: (() => void) | null = null
+
 const triggerQuestionStart = (qNum: number) => {
   if (introTimeout) clearTimeout(introTimeout)
+  if (activeIntroUnwatch) {
+    activeIntroUnwatch()
+    activeIntroUnwatch = null
+  }
   showQuestionIntro.value = true
   
   speakQuestionStart(qNum)
   
-  introTimeout = setTimeout(() => {
-    showQuestionIntro.value = false
-  }, 2500)
+  const startTime = Date.now()
+  
+  const checkAndHide = () => {
+    const elapsed = Date.now() - startTime
+    const remaining = Math.max(0, 2500 - elapsed)
+    
+    const isDone = () => {
+      return !isFetchingQuestion.value && (question.value?.question_number === qNum || question.value === null)
+    }
+
+    if (isDone()) {
+      introTimeout = setTimeout(() => {
+        showQuestionIntro.value = false
+      }, remaining)
+    } else {
+      activeIntroUnwatch = watch(
+        [isFetchingQuestion, () => question.value],
+        () => {
+          if (isDone()) {
+            if (activeIntroUnwatch) {
+              activeIntroUnwatch()
+              activeIntroUnwatch = null
+            }
+            const currentElapsed = Date.now() - startTime
+            const currentRemaining = Math.max(0, 2500 - currentElapsed)
+            introTimeout = setTimeout(() => {
+              showQuestionIntro.value = false
+            }, currentRemaining)
+          }
+        }
+      )
+    }
+  }
+
+  checkAndHide()
 }
 
 // Setup real-time listener for Stage Admin updates
@@ -318,10 +362,10 @@ const setupRealtimeSubscription = () => {
 
       // If active question changed, fetch new question details
       if (payload.new.presenter_active_question !== prevActiveQ) {
-        await fetchActiveQuestion(payload.new.presenter_active_question)
         if (payload.new.presenter_show_state === 'question') {
           triggerQuestionStart(payload.new.presenter_active_question)
         }
+        await fetchActiveQuestion(payload.new.presenter_active_question)
       } else {
         if (payload.new.presenter_show_state === 'correct_teams') {
           await fetchCorrectTeams()
@@ -761,7 +805,7 @@ const handlePageClick = () => {
         </div>
 
         <!-- 3. SLIDE IMAGE MODE (Solution 1) -->
-        <div v-else-if="question.is_image_only" class="presenter-slide-mode">
+        <div v-else-if="question.is_image_only" class="presenter-slide-mode" :class="{ 'invisible-during-intro': showQuestionIntro }">
           <img 
             :src="currentRound.presenter_show_state === 'answer_revealed' && question.answer_image_url ? question.answer_image_url : question.question_image_url" 
             alt="Question Slide"
@@ -770,11 +814,10 @@ const handlePageClick = () => {
         </div>
 
         <!-- 4. DYNAMIC TEXT/HTML MODE (Solution 3) -->
-        <div v-else class="presenter-card text-question-layout">
+        <div v-else class="presenter-card text-question-layout" :class="{ 'invisible-during-intro': showQuestionIntro }">
           <!-- Header info -->
           <div class="question-header">
             <span class="question-badge">ข้อที่ {{ question.question_number }}</span>
-            <span class="question-points">({{ question.points }} คะแนน)</span>
           </div>
 
           <!-- Question Text -->
@@ -1376,6 +1419,12 @@ const handlePageClick = () => {
   z-index: 100;
   border-radius: var(--radius-lg);
   border: 1px solid var(--glass-border);
+}
+
+.invisible-during-intro {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 .intro-badge-cosmic {
