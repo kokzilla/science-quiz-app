@@ -108,7 +108,9 @@ export default defineEventHandler(async (event) => {
     path.resolve(process.cwd(), 'public/questions'),
     path.resolve(process.cwd(), '.output/public/questions'),
     path.resolve(process.cwd(), '../public/questions'),
-    path.resolve(process.cwd(), '../../public/questions')
+    path.resolve(process.cwd(), '../../public/questions'),
+    'C:\\Project\\science-quiz-app\\public\\questions',
+    'C:\\Project\\science-quiz-app\\.output\\public\\questions'
   ]
 
   for (const dir of targetDirs) {
