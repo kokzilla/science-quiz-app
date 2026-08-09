@@ -103,24 +103,23 @@ export default defineEventHandler(async (event) => {
     })
   }
   
-  // Define destination path (public/questions/)
-  const destDir = path.resolve(process.cwd(), 'public/questions')
-  if (!fs.existsSync(destDir)) {
-    fs.mkdirSync(destDir, { recursive: true })
-  }
+  // Save file to all potential target directories to ensure availability
+  const targetDirs = [
+    path.resolve(process.cwd(), 'public/questions'),
+    path.resolve(process.cwd(), '.output/public/questions'),
+    path.resolve(process.cwd(), '../public/questions'),
+    path.resolve(process.cwd(), '../../public/questions')
+  ]
 
-  const destPath = path.join(destDir, safeFilename)
-  
-  // Write the file
-  fs.writeFileSync(destPath, filePart.data)
-
-  // Also save to .output/public/questions if deployed / running built server
-  const outputDestDir = path.resolve(process.cwd(), '.output/public/questions')
-  if (fs.existsSync(path.resolve(process.cwd(), '.output/public'))) {
-    if (!fs.existsSync(outputDestDir)) {
-      fs.mkdirSync(outputDestDir, { recursive: true })
+  for (const dir of targetDirs) {
+    try {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true })
+      }
+      fs.writeFileSync(path.join(dir, safeFilename), filePart.data)
+    } catch (e) {
+      // Ignore errors for non-existent root paths
     }
-    fs.writeFileSync(path.join(outputDestDir, safeFilename), filePart.data)
   }
 
   // Return the web path
