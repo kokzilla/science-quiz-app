@@ -124,9 +124,9 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  // Return the web path
+  // Return the web path through API proxy route
   return {
     success: true,
-    url: `/questions/${safeFilename}`,
+    url: `/api/questions/${safeFilename}`,
   }
 })
