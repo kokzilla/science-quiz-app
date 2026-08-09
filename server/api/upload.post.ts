@@ -22,8 +22,9 @@ export default defineEventHandler(async (event) => {
   }
 
   const passkey = passkeyPart.data.toString('utf-8').trim()
-  const supabaseUrl = process.env.SUPABASE_URL || ''
-  const supabaseKey = process.env.SUPABASE_KEY || ''
+  const config = useRuntimeConfig(event)
+  const supabaseUrl = process.env.SUPABASE_URL || (config.public?.supabaseUrl as string) || ''
+  const supabaseKey = process.env.SUPABASE_KEY || (config.public?.supabaseKey as string) || ''
 
   if (!supabaseUrl || !supabaseKey) {
     throw createError({
@@ -112,6 +113,15 @@ export default defineEventHandler(async (event) => {
   
   // Write the file
   fs.writeFileSync(destPath, filePart.data)
+
+  // Also save to .output/public/questions if deployed / running built server
+  const outputDestDir = path.resolve(process.cwd(), '.output/public/questions')
+  if (fs.existsSync(path.resolve(process.cwd(), '.output/public'))) {
+    if (!fs.existsSync(outputDestDir)) {
+      fs.mkdirSync(outputDestDir, { recursive: true })
+    }
+    fs.writeFileSync(path.join(outputDestDir, safeFilename), filePart.data)
+  }
 
   // Return the web path
   return {
