@@ -629,8 +629,8 @@ const handlePageClick = () => {
       </div>
     </div>
 
-    <!-- Configuration selector (no-print floating top right for testing) -->
-    <div class="no-print" style="position: absolute; top: 1rem; right: 1rem; display: flex; gap: 0.5rem; align-items: center; z-index: 99;">
+    <!-- Configuration selector (no-print floating bottom right to avoid blocking timer) -->
+    <div class="no-print presenter-bottom-controls" style="position: fixed; bottom: 1.2rem; right: 1.2rem; display: flex; gap: 0.5rem; align-items: center; z-index: 99; background: rgba(10, 14, 26, 0.7); padding: 0.35rem 0.5rem; border-radius: 30px; border: 1px solid var(--glass-border); backdrop-filter: blur(8px); box-shadow: 0 4px 15px rgba(0,0,0,0.3);">
       
       <!-- Compact Circular Thai Voice Status Badge -->
       <div 
@@ -806,7 +806,7 @@ const handlePageClick = () => {
               :key="team.id"
               class="correct-team-badge"
             >
-              {{ String(team.team_number).padStart(2, '0') }}
+              {{ team.team_number }}
             </div>
           </div>
         </div>
@@ -2019,6 +2019,12 @@ const handlePageClick = () => {
   border-color: rgba(0, 172, 193, 0.3);
   color: var(--color-cyan);
   box-shadow: 0 4px 20px rgba(0, 172, 193, 0.1);
+}
+
+.light-theme .presenter-bottom-controls {
+  background: rgba(255, 255, 255, 0.88) !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08) !important;
 }
 
 @media (max-height: 900px) or (min-aspect-ratio: 1.8/1) {

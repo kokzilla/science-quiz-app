@@ -21,7 +21,7 @@ const { theme, toggleTheme } = useTheme()
 const route = useRoute()
 const { supabase, isConfigured } = useSupabase()
 
-const sortBy = ref<'score' | 'team'>('score')
+const sortBy = ref<'score' | 'team'>('team')
 const teams = ref<Team[]>([])
 const answers = ref<Answer[]>([])
 const questions = ref<Question[]>([])
@@ -35,11 +35,12 @@ let answersChannel: any = null
 let roundsChannel: any = null
 let teamsChannel: any = null
 
-// Pagination / Scrolling State for 30-40 teams
-const currentPage = ref(0)
-const teamsPerPage = 10
+// Smooth Auto-Scrolling State for all teams
 const isAutoScrolling = ref(true)
-let scrollInterval: any = null
+let scrollAnimId: number | null = null
+let isPausedForLoop = false
+let loopTimeout: any = null
+const scrollSpeed = 0.85 // pixels per frame (smooth slow scroll)
 
 // Callback when selected round changes
 const onRoundChanged = async (roundId: string) => {
@@ -57,34 +58,104 @@ const {
   handleRoundChange
 } = useRoundSelector(onRoundChanged)
 
-onMounted(() => {
-  // Auto-scrolling timer
-  startScrollTimer()
-})
+const startSmoothScroll = () => {
+  stopSmoothScroll()
+  if (!isAutoScrolling.value || typeof window === 'undefined') return
 
-onUnmounted(() => {
-  cleanupSubscriptions()
-  stopScrollTimer()
-})
+  let lastTime = performance.now()
 
-const startScrollTimer = () => {
-  stopScrollTimer()
-  scrollInterval = setInterval(() => {
-    if (isAutoScrolling.value && totalPages.value > 1) {
-      currentPage.value = (currentPage.value + 1) % totalPages.value
+  const step = (time: number) => {
+    if (!isAutoScrolling.value) return
+
+    const delta = time - lastTime
+    lastTime = time
+
+    if (!isPausedForLoop) {
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight
+
+      if (maxScroll > 20) {
+        const currentScroll = window.scrollY || window.pageYOffset || document.documentElement.scrollTop
+        
+        if (currentScroll >= maxScroll - 3) {
+          // Reached bottom: Pause at bottom for 3.5s so viewers can see the final teams
+          isPausedForLoop = true
+          loopTimeout = setTimeout(() => {
+            if (!isAutoScrolling.value) {
+              isPausedForLoop = false
+              return
+            }
+            // Smoothly scroll back to top
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+            
+            // Pause at top for 3s before restarting scroll down
+            loopTimeout = setTimeout(() => {
+              isPausedForLoop = false
+              lastTime = performance.now()
+              if (isAutoScrolling.value) {
+                scrollAnimId = requestAnimationFrame(step)
+              }
+            }, 3000)
+          }, 3500)
+          return
+        } else {
+          // Scroll down continuously
+          const moveBy = scrollSpeed * Math.min(delta / 16.67, 3)
+          window.scrollBy(0, moveBy)
+        }
+      }
     }
-  }, 8000) // Change page every 8 seconds
+
+    if (isAutoScrolling.value) {
+      scrollAnimId = requestAnimationFrame(step)
+    }
+  }
+
+  scrollAnimId = requestAnimationFrame(step)
 }
 
-const stopScrollTimer = () => {
-  if (scrollInterval) clearInterval(scrollInterval)
+const stopSmoothScroll = () => {
+  if (scrollAnimId) {
+    cancelAnimationFrame(scrollAnimId)
+    scrollAnimId = null
+  }
+  if (loopTimeout) {
+    clearTimeout(loopTimeout)
+    loopTimeout = null
+  }
+  isPausedForLoop = false
 }
 
 const toggleAutoScroll = () => {
   isAutoScrolling.value = !isAutoScrolling.value
-  if (isAutoScrolling.value) startScrollTimer()
-  else stopScrollTimer()
+  if (isAutoScrolling.value) {
+    startSmoothScroll()
+  } else {
+    stopSmoothScroll()
+  }
 }
+
+watch([sortBy, selectedRoundId], () => {
+  if (typeof window !== 'undefined') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  if (isAutoScrolling.value) {
+    stopSmoothScroll()
+    setTimeout(() => {
+      startSmoothScroll()
+    }, 1500)
+  }
+})
+
+onMounted(() => {
+  setTimeout(() => {
+    startSmoothScroll()
+  }, 1200)
+})
+
+onUnmounted(() => {
+  cleanupSubscriptions()
+  stopSmoothScroll()
+})
 
 const cleanupSubscriptions = () => {
   if (answersChannel && supabase.value) supabase.value.removeChannel(answersChannel)
@@ -296,14 +367,6 @@ const leaderboard = computed(() => {
 
   return rankedTeams
 })
-
-// Pagination
-const totalPages = computed(() => Math.ceil(leaderboard.value.length / teamsPerPage))
-
-const paginatedLeaderboard = computed(() => {
-  const start = currentPage.value * teamsPerPage
-  return leaderboard.value.slice(start, start + teamsPerPage)
-})
 </script>
 
 <template>
@@ -336,11 +399,11 @@ const paginatedLeaderboard = computed(() => {
       </div>
 
       <div class="control-pill-group">
-        <span class="pill-label">เลื่อนหน้าจออัตโนมัติ:</span>
+        <span class="pill-label">เลื่อนอัตโนมัติ:</span>
         <button @click="toggleAutoScroll" class="btn pill-btn play-pause-btn">
           <Pause v-if="isAutoScrolling" :size="12" />
           <Play v-else :size="12" />
-          <span>{{ isAutoScrolling ? 'เปิด' : 'ปิด' }}</span>
+          <span>{{ isAutoScrolling ? 'เปิด' : 'หยุด' }}</span>
         </button>
       </div>
     </div>
@@ -363,7 +426,7 @@ const paginatedLeaderboard = computed(() => {
     <!-- Main Scoreboard TV Layout -->
     <template v-else-if="currentRound">
       
-      <!-- Top Title Bar -->
+      <!-- Top Title Bar (Sticky at top) -->
       <div class="scoreboard-header">
         <h1 class="scoreboard-title">Scoreboard การแข่งระดับ {{ currentRound.name }}</h1>
         <div class="scoreboard-subtitle">
@@ -375,7 +438,7 @@ const paginatedLeaderboard = computed(() => {
             (ซ่อนคะแนนการแข่งชั่วคราว)
           </span>
           - <span class="sort-highlight">เรียงลำดับตาม <span class="text-cyan font-bold">{{ sortBy === 'score' ? 'คะแนน' : 'เลขทีม' }}</span></span>
-          - เลื่อนแสดงผลอัตโนมัติหน้าละ 10 ทีม
+          - รวมทั้งสิ้น {{ leaderboard.length }} ทีม (เลื่อนหน้าจออัตโนมัติ)
         </div>
       </div>
 
@@ -385,65 +448,37 @@ const paginatedLeaderboard = computed(() => {
           ไม่มีทีมเข้าแข่งในระบบ
         </div>
 
-        <Transition v-else name="fade" mode="out-in">
-          <TransitionGroup 
-            :key="currentPage" 
-            name="flip-list" 
-            tag="div" 
-            class="scoreboard-grid-container"
+        <div v-else class="scoreboard-grid-container">
+          <div 
+            v-for="item in leaderboard" 
+            :key="item.id"
+            class="scoreboard-row"
+            :class="`rank-${item.rank}`"
           >
-            <div 
-              v-for="item in paginatedLeaderboard" 
-              :key="item.id"
-              class="scoreboard-row"
-              :class="`rank-${item.rank}`"
-            >
-              <!-- Team number (Outstanding) -->
-              <div class="team-no">
-                TEAM {{ String(item.team_number).padStart(2, '0') }}
-              </div>
-
-              <!-- Team Name -->
-              <div class="team-name">
-                <span class="team-name-text" :title="item.name">{{ item.name }}</span>
-                <span v-if="item.tie_breaker_score > 0" class="status-pill-tiebreak">
-                  ไทเบรก +{{ item.tie_breaker_score }}
-                </span>
-              </div>
-
-              <!-- Points display -->
-              <div class="team-score">
-                {{ item.finalScore }} <span class="score-label">คะแนน</span>
-              </div>
-
-              <!-- Rank badge (Moved behind score) -->
-              <div class="rank-badge">
-                {{ item.rank }}
-              </div>
+            <!-- Team number -->
+            <div class="team-no">
+              ทีมที่ {{ item.team_number }}
             </div>
-          </TransitionGroup>
-        </Transition>
-      </div>
 
-      <!-- Bottom Pager Indicator (TV view pagination progress) -->
-      <div v-if="totalPages > 1" class="no-print pagination-footer">
-        <button 
-          @click="currentPage = (currentPage - 1 + totalPages) % totalPages" 
-          class="btn btn-secondary pager-nav-btn"
-        >
-          <ChevronLeft :size="16" />
-        </button>
-        
-        <span class="pagination-indicator-text">
-          หน้า {{ currentPage + 1 }} / {{ totalPages }} (ทีมที่ {{ currentPage * teamsPerPage + 1 }} - {{ Math.min((currentPage + 1) * teamsPerPage, leaderboard.length) }})
-        </span>
+            <!-- Team Name -->
+            <div class="team-name">
+              <span class="team-name-text" :title="item.name">{{ item.name }}</span>
+              <span v-if="item.tie_breaker_score > 0" class="status-pill-tiebreak">
+                ไทเบรก +{{ item.tie_breaker_score }}
+              </span>
+            </div>
 
-        <button 
-          @click="currentPage = (currentPage + 1) % totalPages" 
-          class="btn btn-secondary pager-nav-btn"
-        >
-          <ChevronRight :size="16" />
-        </button>
+            <!-- Points display -->
+            <div class="team-score">
+              {{ item.finalScore }} <span class="score-label">คะแนน</span>
+            </div>
+
+            <!-- Rank badge -->
+            <div class="rank-badge">
+              ลำดับที่ {{ item.rank }}
+            </div>
+          </div>
+        </div>
       </div>
 
     </template>
@@ -452,9 +487,9 @@ const paginatedLeaderboard = computed(() => {
 
 <style scoped>
 .controls-floating-bar {
-  position: absolute; 
+  position: fixed; 
   top: 1rem; 
-  right: 1rem; 
+  right: 1.5rem; 
   display: flex; 
   gap: 0.5rem; 
   z-index: 100; 
@@ -593,31 +628,20 @@ const paginatedLeaderboard = computed(() => {
   font-size: 1.5rem;
 }
 
-.pagination-footer {
-  display: flex; 
-  justify-content: center; 
-  align-items: center; 
-  gap: 1rem; 
-  margin-top: 1.5rem; 
-  padding-bottom: 0.5rem;
-}
-
-.pager-nav-btn {
-  padding: 0.25rem 0.5rem;
-}
-
-.pagination-indicator-text {
-  font-family: var(--font-title); 
-  font-size: 1rem; 
-  color: var(--text-secondary);
-}
-
 .scoreboard-view {
   position: relative;
 }
 
 .scoreboard-header {
-  margin-top: 4.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  padding: 1.25rem 0 1rem 0;
+  margin-top: 0;
+  background: rgba(10, 12, 22, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--glass-border);
+  margin-bottom: 1.5rem;
 }
 
 .scoreboard-grid-container {
@@ -625,14 +649,12 @@ const paginatedLeaderboard = computed(() => {
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
   align-content: start;
+  padding-bottom: 5rem;
 }
 
 @media (max-width: 1024px) {
   .scoreboard-grid-container {
     grid-template-columns: 1fr;
-  }
-  .scoreboard-header {
-    margin-top: 6.5rem;
   }
 }
 
