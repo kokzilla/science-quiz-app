@@ -556,11 +556,22 @@ const enableAudio = () => {
 }
 
 const questionFontSize = computed(() => {
-  if (!question.value || !question.value.question_text) return '3.6rem'
+  if (!question.value || !question.value.question_text) return '4.8rem'
+  const hasImg = !!question.value.question_image_url
   const len = question.value.question_text.length
-  if (len < 60) return '5.4rem'
-  if (len < 120) return '4.4rem'
-  return '3.6rem'
+  
+  if (hasImg) {
+    if (len < 50) return 'clamp(3.8rem, 4.6vw, 5.4rem)'
+    if (len < 100) return 'clamp(3.0rem, 3.8vw, 4.4rem)'
+    if (len < 180) return 'clamp(2.5rem, 3.0vw, 3.6rem)'
+    return 'clamp(2.2rem, 2.5vw, 3.0rem)'
+  }
+
+  if (len < 35) return 'clamp(5.2rem, 6.8vw, 7.5rem)'
+  if (len < 75) return 'clamp(4.4rem, 5.6vw, 6.2rem)'
+  if (len < 130) return 'clamp(3.6rem, 4.5vw, 5.0rem)'
+  if (len < 200) return 'clamp(3.0rem, 3.6vw, 4.2rem)'
+  return 'clamp(2.5rem, 3.0vw, 3.5rem)'
 })
 
 const handleRoundChange = () => {
@@ -886,31 +897,34 @@ const handlePageClick = () => {
     radial-gradient(circle at 50% 0%, rgba(213, 0, 249, 0.08) 0%, transparent 70%),
     radial-gradient(circle at 100% 100%, rgba(0, 229, 255, 0.04) 0%, transparent 60%);
   min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 1.5rem 1.5rem 8rem 1.5rem; /* Pushes content up to prevent stage edge blockage */
+  padding: 0.5rem 1.5rem 5.5rem 1.5rem; /* 5.5rem bottom clearance to prevent stage blockage */
   overflow: hidden;
   color: var(--text-primary);
   font-family: var(--font-body);
+  box-sizing: border-box;
 }
 
 .presentation-container {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   position: relative;
-  max-width: 95vw; /* Fills widescreen LED displays beautifully */
+  max-width: 98vw; /* Fills widescreen displays */
   margin: 0 auto;
   width: 100%;
+  height: 100%;
 }
 
 .presenter-card {
-  background: rgba(10, 12, 22, 0.6);
-  border: 1px solid var(--glass-border);
+  background: rgba(10, 12, 22, 0.65);
+  border: 1.5px solid var(--glass-border);
   box-shadow: var(--shadow-card);
   border-radius: var(--radius-lg);
-  padding: 3rem;
+  padding: 1.5rem 2.5rem 2rem 2.5rem;
 }
 
 /* Audio unlock overlay */
@@ -930,8 +944,8 @@ const handlePageClick = () => {
 /* Timer Countdown Radial Overlay */
 .timer-overlay {
   position: absolute;
-  top: 2rem;
-  right: 2rem;
+  top: 1rem;
+  right: 1.5rem;
   z-index: 50;
 }
 .timer-circle {
@@ -1048,17 +1062,21 @@ const handlePageClick = () => {
 
 /* Dynamic text/HTML mode (Solution 3) */
 .text-question-layout {
+  flex: 1;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 1.8rem;
-  min-height: 70vh;
-  justify-content: flex-start; /* Aligns to top of card, leaving blank space at bottom */
+  justify-content: space-between;
+  gap: 1.5rem;
+  box-sizing: border-box;
+  margin-bottom: 0.5rem;
 }
 
 .question-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 0.2rem;
 }
 
 .question-badge {
@@ -1066,8 +1084,8 @@ const handlePageClick = () => {
   color: #000;
   font-family: var(--font-title);
   font-weight: 900;
-  font-size: 2.2rem;
-  padding: 0.5rem 2rem;
+  font-size: 2.6rem;
+  padding: 0.4rem 2.2rem;
   border-radius: var(--radius-sm);
 }
 
@@ -1084,95 +1102,113 @@ const handlePageClick = () => {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 2rem;
+  gap: 1.5rem;
+  padding: 0.5rem 1rem;
 }
 
 .question-text {
-  font-size: 2.8rem;
-  font-weight: 700;
+  font-weight: 750;
   text-align: center;
-  line-height: 1.4;
+  line-height: 1.3;
   color: #fff;
+  max-width: 98%;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.5));
 }
 
 .question-image-box {
-  max-height: 22vh;
+  max-height: 25vh;
   overflow: hidden;
   border-radius: var(--radius-sm);
   border: 1px solid var(--glass-border);
 }
 .question-diagram {
-  max-height: 22vh;
+  max-height: 25vh;
   object-fit: contain;
 }
 
 .choices-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
+  gap: 1.5rem 2.2rem;
+  width: 100%;
+  margin-bottom: 0.5rem; /* Elevated from card bottom */
 }
 .choices-grid.layout-1-col {
   grid-template-columns: 1fr;
-  gap: 1.2rem; /* Reduced gap to save height */
-  max-width: 1400px;
-  margin: 0 auto;
+  gap: 1.2rem;
+  max-width: 100%;
+  margin: 0 auto 0.5rem auto;
   width: 100%;
 }
 .choices-grid.layout-1-col .choice-card {
-  padding: 1.1rem 3rem; /* Reduced vertical padding to save height, kept large horizontal padding */
-  gap: 2rem;
+  padding: 1.6rem 3.5rem;
+  gap: 2.5rem;
+  min-height: 120px;
 }
 .choices-grid.layout-1-col .choice-letter {
-  width: 80px; /* Reduced from 90px to save height */
-  height: 80px;
-  font-size: 3rem; /* Still very large */
+  width: 110px;
+  height: 110px;
+  min-width: 110px;
+  font-size: 4.6rem;
 }
 .choices-grid.layout-1-col .choice-text {
-  font-size: 3rem; /* Still very large */
+  font-size: clamp(3.6rem, 4.5vw, 4.8rem);
 }
 
 .choice-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--glass-border);
-  padding: 1.1rem 2.2rem; /* Reduced top/bottom padding to prevent stage cutoff */
-  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid var(--glass-border);
+  padding: 1.6rem 2.8rem;
+  border-radius: 20px;
   display: flex;
   align-items: center;
-  gap: 1.8rem;
-  transition: all 0.5s ease;
+  gap: 2.4rem;
+  transition: all 0.3s ease;
+  min-height: 120px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 }
 
 .choice-letter {
-  width: 80px;
-  height: 80px;
+  width: 110px;
+  height: 110px;
+  min-width: 110px;
   border-radius: 50%;
-  background: var(--bg-tertiary);
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-title);
-  font-size: 2.8rem; /* Increased size */
+  font-size: 4.6rem;
   font-weight: 900;
   color: #fff;
-  transition: all 0.5s ease;
+  transition: all 0.3s ease;
   flex-shrink: 0;
 }
 
 .choice-text {
-  font-size: 2.8rem; /* Increased size */
-  font-weight: 600;
+  font-size: clamp(3.6rem, 4.5vw, 4.8rem);
+  font-weight: 700;
+  line-height: 1.3;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  flex: 1;
+  color: #fff;
 }
 
 /* Choices Reveal States */
 .choice-card.correct {
-  background: rgba(0, 230, 118, 0.08) !important;
+  background: rgba(0, 230, 118, 0.14) !important;
   border-color: var(--color-success) !important;
-  box-shadow: 0 0 20px rgba(0, 230, 118, 0.2);
+  box-shadow: 0 0 25px rgba(0, 230, 118, 0.35);
   transform: scale(1.02);
 }
 .choice-card.correct .choice-letter {
   background: var(--color-success) !important;
   color: #052e16 !important;
+  border-color: var(--color-success) !important;
 }
 
 .choice-card.incorrect {
@@ -1190,11 +1226,13 @@ const handlePageClick = () => {
   background-image: 
     radial-gradient(circle at 50% 0%, rgba(142, 36, 170, 0.04) 0%, transparent 70%),
     radial-gradient(at 100% 100%, rgba(0, 172, 193, 0.03) 0%, transparent 60%);
+  color: #0f172a;
 }
 
 .light-theme .presenter-card {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(15, 23, 42, 0.12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
 
 .light-theme .timer-circle {
@@ -1207,27 +1245,41 @@ const handlePageClick = () => {
 }
 
 .light-theme .question-text {
-  color: #0f172a;
+  color: #0f172a !important;
+  filter: none;
 }
 
 .light-theme .choice-card {
-  background: rgba(15, 23, 42, 0.02);
-  border-color: rgba(15, 23, 42, 0.05);
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.18) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
 
 .light-theme .choice-card .choice-letter {
-  background: #cbd5e1;
-  color: #0f172a;
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+  border-color: #94a3b8 !important;
+}
+
+.light-theme .choice-card .choice-text,
+.light-theme .choice-text {
+  color: #0f172a !important;
 }
 
 .light-theme .choice-card.correct {
-  background: rgba(0, 230, 118, 0.1) !important;
+  background: rgba(0, 230, 118, 0.15) !important;
   border-color: var(--color-success) !important;
+  box-shadow: 0 0 25px rgba(0, 230, 118, 0.25);
 }
 
 .light-theme .choice-card.correct .choice-letter {
   background: var(--color-success) !important;
-  color: #fff !important;
+  color: #ffffff !important;
+  border-color: var(--color-success) !important;
+}
+
+.light-theme .choice-card.correct .choice-text {
+  color: #052e16 !important;
 }
 
 .light-theme .correct-team-badge {
@@ -1254,10 +1306,10 @@ const handlePageClick = () => {
    ========================================================================== */
 @media (max-height: 900px) or (min-aspect-ratio: 1.8/1) {
   .presenter-view {
-    padding: 1rem 1.5rem 5rem 1.5rem; /* Reduce vertical padding on short/wide displays */
+    padding: 0.4rem 1.2rem 4rem 1.2rem;
   }
   .presenter-card {
-    padding: 2rem;
+    padding: 1.2rem 1.8rem 1.5rem 1.8rem;
   }
   .correct-teams-container {
     min-height: 500px;
@@ -1271,36 +1323,54 @@ const handlePageClick = () => {
     font-size: 2.8rem;
   }
   .text-question-layout {
-    min-height: 60vh;
     gap: 1rem;
+    margin-bottom: 0.2rem;
+  }
+  .question-badge {
+    font-size: 2.2rem;
+    padding: 0.3rem 1.6rem;
   }
   .question-image-box, .question-diagram {
-    max-height: 18vh !important; /* Slightly shrink diagram to fit shorter viewports */
+    max-height: 20vh !important;
   }
   .choices-grid {
-    gap: 1.2rem;
+    gap: 1.1rem 1.5rem;
+    margin-bottom: 0.2rem;
   }
   .choice-card {
-    padding: 1.1rem 1.8rem; /* Reduced padding */
-    gap: 1.2rem;
+    padding: 1.1rem 2rem;
+    gap: 1.8rem;
+    min-height: 95px;
+  }
+  .choice-letter {
+    width: 90px;
+    height: 90px;
+    min-width: 90px;
+    font-size: 3.8rem;
+  }
+  .choice-text {
+    font-size: clamp(3.0rem, 3.6vw, 3.8rem);
   }
   .choices-grid.layout-1-col {
-    gap: 1rem;
+    gap: 0.9rem;
+    margin-bottom: 0.2rem;
   }
   .choices-grid.layout-1-col .choice-card {
-    padding: 0.9rem 2.4rem;
-    gap: 1.5rem;
+    padding: 1.1rem 2.5rem;
+    gap: 2rem;
+    min-height: 95px;
   }
   .choices-grid.layout-1-col .choice-letter {
-    width: 70px;
-    height: 70px;
-    font-size: 2.6rem;
+    width: 90px;
+    height: 90px;
+    min-width: 90px;
+    font-size: 3.8rem;
   }
   .choices-grid.layout-1-col .choice-text {
-    font-size: 2.6rem;
+    font-size: clamp(3.0rem, 3.6vw, 3.8rem);
   }
   .timer-overlay {
-    top: 1rem;
+    top: 0.8rem;
     right: 1rem;
   }
   .timer-circle {
@@ -1314,10 +1384,10 @@ const handlePageClick = () => {
 
 @media (max-height: 720px) {
   .presenter-view {
-    padding: 0.5rem 1rem 4rem 1rem;
+    padding: 0.3rem 0.8rem 3rem 0.8rem;
   }
   .presenter-card {
-    padding: 1rem 1.5rem;
+    padding: 0.8rem 1.2rem;
   }
   .correct-teams-container {
     min-height: 400px;
@@ -1331,33 +1401,45 @@ const handlePageClick = () => {
     font-size: 2.2rem;
   }
   .question-header {
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.2rem;
   }
   .question-badge {
     font-size: 1.8rem;
-    padding: 0.25rem 1rem;
+    padding: 0.25rem 1.2rem;
   }
   .question-points {
     font-size: 1.6rem;
   }
   .choice-card {
-    padding: 0.8rem 1.5rem; /* Reduced padding */
-    gap: 1rem;
+    padding: 0.8rem 1.6rem;
+    gap: 1.4rem;
+    min-height: 80px;
+  }
+  .choice-letter {
+    width: 72px;
+    height: 72px;
+    min-width: 72px;
+    font-size: 2.8rem;
+  }
+  .choice-text {
+    font-size: 2.6rem;
   }
   .choices-grid.layout-1-col {
-    gap: 0.8rem;
+    gap: 0.7rem;
   }
   .choices-grid.layout-1-col .choice-card {
-    padding: 0.7rem 1.8rem;
-    gap: 1.2rem;
+    padding: 0.8rem 1.8rem;
+    gap: 1.4rem;
+    min-height: 80px;
   }
   .choices-grid.layout-1-col .choice-letter {
-    width: 60px;
-    height: 60px;
-    font-size: 2.2rem;
+    width: 72px;
+    height: 72px;
+    min-width: 72px;
+    font-size: 2.8rem;
   }
   .choices-grid.layout-1-col .choice-text {
-    font-size: 2.2rem;
+    font-size: 2.6rem;
   }
 }
 
@@ -1821,17 +1903,19 @@ const handlePageClick = () => {
 }
 
 .light-theme .sample-choice-card {
-  background: rgba(15, 23, 42, 0.02);
-  border-color: rgba(15, 23, 42, 0.05);
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.18) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
 }
 
 .light-theme .sample-choice-letter {
-  background: #cbd5e1;
-  color: #0f172a;
+  background: #e2e8f0 !important;
+  color: #0f172a !important;
+  border: 2px solid #94a3b8;
 }
 
 .light-theme .sample-choice-text {
-  color: #0f172a;
+  color: #0f172a !important;
 }
 
 .light-theme .get-ready-subtitle {
