@@ -425,14 +425,22 @@ const syncTimerState = () => {
   }
 }
 
+let lastTimerIso: string | null = null
+let localTimerStartMs: number | null = null
+
 const startLocalTimer = (startedAtIso: string) => {
+  // If timer for this exact startedAt event is already actively running, do not reset it
+  if (lastTimerIso === startedAtIso && timerActive.value && timerInterval) {
+    return
+  }
+
   stopLocalTimer()
-  
-  const startedAt = new Date(startedAtIso).getTime()
+  lastTimerIso = startedAtIso
+  localTimerStartMs = Date.now()
   
   const updateTimer = () => {
     const now = Date.now()
-    const elapsed = Math.floor((now - startedAt) / 1000)
+    const elapsed = Math.floor((now - (localTimerStartMs || now)) / 1000)
     const remaining = Math.max(0, 30 - elapsed)
     
     timerRemaining.value = remaining
@@ -487,8 +495,13 @@ const startLocalSampleTimer = () => {
 }
 
 const stopLocalTimer = () => {
-  if (timerInterval) clearInterval(timerInterval)
+  if (timerInterval) {
+    clearInterval(timerInterval)
+    timerInterval = null
+  }
   timerActive.value = false
+  lastTimerIso = null
+  localTimerStartMs = null
 }
 
 // Watchers to immediately stop speech when audio/TTS is muted
@@ -562,16 +575,16 @@ const questionFontSize = computed(() => {
   
   if (hasImg) {
     if (len < 50) return 'clamp(3.8rem, 4.6vw, 5.4rem)'
-    if (len < 100) return 'clamp(3.0rem, 3.8vw, 4.4rem)'
-    if (len < 180) return 'clamp(2.5rem, 3.0vw, 3.6rem)'
-    return 'clamp(2.2rem, 2.5vw, 3.0rem)'
+    if (len < 100) return 'clamp(3.2rem, 4.0vw, 4.6rem)'
+    if (len < 180) return 'clamp(2.8rem, 3.4vw, 4.0rem)'
+    return 'clamp(2.5rem, 3.0vw, 3.4rem)'
   }
 
-  if (len < 35) return 'clamp(5.2rem, 6.8vw, 7.5rem)'
-  if (len < 75) return 'clamp(4.4rem, 5.6vw, 6.2rem)'
-  if (len < 130) return 'clamp(3.6rem, 4.5vw, 5.0rem)'
-  if (len < 200) return 'clamp(3.0rem, 3.6vw, 4.2rem)'
-  return 'clamp(2.5rem, 3.0vw, 3.5rem)'
+  if (len < 40) return 'clamp(5.2rem, 6.8vw, 7.5rem)'
+  if (len < 90) return 'clamp(4.6rem, 5.8vw, 6.4rem)'
+  if (len < 160) return 'clamp(4.0rem, 5.0vw, 5.6rem)'
+  if (len < 240) return 'clamp(3.6rem, 4.4vw, 4.8rem)'
+  return 'clamp(3.2rem, 3.8vw, 4.2rem)'
 })
 
 const handleRoundChange = () => {
