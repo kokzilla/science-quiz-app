@@ -1540,25 +1540,28 @@ const handlePageClick = () => {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 5rem 3rem;
-  min-height: 70vh;
+  padding: 4rem 3rem 5rem 3rem;
+  min-height: calc(100vh - 7rem);
+  flex: 1;
+  height: 100%;
   animation: fadeIn 0.5s ease-out;
+  gap: 2.2rem;
 }
 
 .welcome-org-section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 2rem;
+  gap: 1.2rem;
+  margin-bottom: 1.5rem;
   animation: fadeInDown 0.6s ease-out;
 }
 
 .welcome-logo {
-  width: 140px;
-  height: 140px;
+  width: 190px;
+  height: 190px;
   object-fit: contain;
-  filter: drop-shadow(0 0 15px rgba(213, 0, 249, 0.2));
+  filter: drop-shadow(0 0 20px rgba(213, 0, 249, 0.25));
   transition: transform 0.5s ease;
 }
 
@@ -1568,41 +1571,44 @@ const handlePageClick = () => {
 
 .welcome-org-name {
   font-family: var(--font-body);
-  font-size: 1.8rem;
-  font-weight: 600;
+  font-size: clamp(2.4rem, 3.0vw, 3.4rem);
+  font-weight: 700;
   color: var(--text-secondary);
   letter-spacing: 1px;
 }
 
 .welcome-title {
   font-family: var(--font-title);
-  font-size: 5.8rem;
-  font-weight: 800;
+  font-size: clamp(6.0rem, 7.5vw, 9.0rem);
+  font-weight: 900;
+  line-height: 1.2;
   background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 20px rgba(0, 229, 255, 0.15));
-  margin-bottom: 1.5rem;
+  filter: drop-shadow(0 0 25px rgba(0, 229, 255, 0.2));
+  margin-bottom: 0.8rem;
 }
 
 .welcome-subtitle {
   font-family: var(--font-body);
-  font-size: 4.2rem;
-  font-weight: 700;
+  font-size: clamp(4.4rem, 5.5vw, 6.4rem);
+  font-weight: 800;
   color: var(--text-primary);
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .welcome-date {
   font-family: var(--font-body);
-  font-size: 2.6rem;
+  font-size: clamp(2.8rem, 3.4vw, 4.0rem);
+  font-weight: 700;
   color: var(--text-secondary);
-  border: 1px solid var(--glass-border);
+  border: 1.5px solid var(--glass-border);
   background: var(--bg-primary);
-  padding: 0.75rem 2.5rem;
-  border-radius: 40px;
+  padding: 1.2rem 3.8rem;
+  border-radius: 50px;
   display: inline-block;
   margin-top: 1rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
 @keyframes pulseHint {
@@ -1628,54 +1634,61 @@ const handlePageClick = () => {
 
 @media (max-height: 900px) or (min-aspect-ratio: 1.8/1) {
   .welcome-container {
-    padding: 3rem 2rem;
-    min-height: 60vh;
+    padding: 2.5rem 2rem;
+    min-height: calc(100vh - 5rem);
+    gap: 1.4rem;
   }
   .welcome-logo {
-    width: 110px;
-    height: 110px;
+    width: 140px;
+    height: 140px;
   }
   .welcome-org-name {
-    font-size: 1.5rem;
+    font-size: 2.2rem;
   }
   .welcome-org-section {
-    margin-bottom: 1.5rem;
+    margin-bottom: 1rem;
+    gap: 0.8rem;
   }
   .welcome-title {
-    font-size: 4.6rem;
+    font-size: clamp(5.0rem, 6.0vw, 7.0rem);
+    margin-bottom: 0.5rem;
   }
   .welcome-subtitle {
-    font-size: 3.4rem;
+    font-size: clamp(3.4rem, 4.2vw, 4.8rem);
+    margin-bottom: 0.5rem;
   }
   .welcome-date {
-    font-size: 2.0rem;
+    font-size: 2.4rem;
+    padding: 0.8rem 2.8rem;
   }
 }
 
 @media (max-height: 720px) {
   .welcome-container {
-    padding: 2rem 1.5rem;
-    min-height: 50vh;
+    padding: 1.5rem 1.5rem;
+    min-height: calc(100vh - 3.5rem);
+    gap: 0.8rem;
   }
   .welcome-logo {
-    width: 85px;
-    height: 85px;
+    width: 100px;
+    height: 100px;
   }
   .welcome-org-name {
-    font-size: 1.2rem;
+    font-size: 1.6rem;
   }
   .welcome-org-section {
-    margin-bottom: 1rem;
-    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    gap: 0.4rem;
   }
   .welcome-title {
-    font-size: 3.6rem;
+    font-size: 4.2rem;
   }
   .welcome-subtitle {
-    font-size: 2.6rem;
+    font-size: 2.8rem;
   }
   .welcome-date {
-    font-size: 1.6rem;
+    font-size: 1.8rem;
+    padding: 0.5rem 2rem;
   }
 }
 /* Rules Screen Styles */
@@ -1684,34 +1697,37 @@ const handlePageClick = () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 6rem 3rem;
-  min-height: 70vh;
+  padding: 4rem 3rem 5rem 3rem;
+  min-height: calc(100vh - 7rem);
+  flex: 1;
+  height: 100%;
   animation: fadeIn 0.5s ease-out;
   text-align: center;
+  gap: 3rem;
 }
 
 .rules-title {
   font-family: var(--font-title);
-  font-size: 6.2rem;
-  font-weight: 800;
+  font-size: clamp(6.0rem, 7.5vw, 8.5rem);
+  font-weight: 900;
   color: #fff;
-  margin-bottom: 4.5rem;
+  margin-bottom: 2rem;
   background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 15px rgba(0, 229, 255, 0.1));
+  filter: drop-shadow(0 0 25px rgba(0, 229, 255, 0.2));
 }
 
 .rules-content-card {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid var(--glass-border);
   padding: 5rem 8rem;
-  border-radius: var(--radius-lg);
+  border-radius: 28px;
   box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
-  gap: 3.5rem;
-  max-width: 1050px;
+  gap: 4rem;
+  max-width: 1400px;
   width: 100%;
 }
 
@@ -1719,115 +1735,125 @@ const handlePageClick = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 2.5rem;
+  gap: 3rem;
 }
 
 .rule-icon {
-  font-size: 4.2rem;
+  font-size: 5.5rem;
 }
 
 .rule-text {
-  font-size: 3.4rem;
-  font-weight: 600;
+  font-size: clamp(3.6rem, 4.4vw, 5.0rem);
+  font-weight: 700;
   color: var(--text-primary);
 }
 
 .highlight-yellow {
   color: var(--color-gold);
-  font-size: 4.2rem;
-  font-weight: 800;
+  font-size: clamp(4.4rem, 5.2vw, 6.0rem);
+  font-weight: 900;
   white-space: nowrap;
 }
 
 .highlight-cyan {
   color: var(--color-cyan);
-  font-size: 4.2rem;
-  font-weight: 800;
+  font-size: clamp(4.4rem, 5.2vw, 6.0rem);
+  font-weight: 900;
   white-space: nowrap;
 }
 
 /* Sample Question Screen Styles */
 .sample-q-container {
-  padding: 4rem 3rem;
-  min-height: 70vh;
+  padding: 2rem 3rem 4.5rem 3rem;
+  min-height: calc(100vh - 7rem);
+  flex: 1;
+  height: 100%;
   animation: fadeIn 0.5s ease-out;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-between;
+  gap: 1.5rem;
 }
 
 .sample-badge {
-  background: rgba(213, 0, 249, 0.15);
-  border: 1px solid rgba(213, 0, 249, 0.3);
+  background: rgba(213, 0, 249, 0.18);
+  border: 1.5px solid rgba(213, 0, 249, 0.4);
   color: var(--color-purple);
-  padding: 0.6rem 2rem;
-  border-radius: 20px;
-  font-size: 1.8rem;
-  font-weight: 700;
+  padding: 0.6rem 2.5rem;
+  border-radius: 30px;
+  font-size: 2.2rem;
+  font-weight: 800;
   align-self: center;
-  margin-bottom: 2.5rem;
+  margin-bottom: 1rem;
   letter-spacing: 1px;
 }
 
 .sample-q-text {
-  font-size: 4.8rem;
-  font-weight: 700;
+  font-size: clamp(4.4rem, 5.6vw, 6.2rem);
+  font-weight: 750;
   color: #fff;
   text-align: center;
-  margin-bottom: 4.5rem;
-  line-height: 1.5;
+  margin-bottom: 1.5rem;
+  line-height: 1.35;
+  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.5));
 }
 
 .sample-choices-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 3rem;
-  max-width: 1200px;
-  margin: 0 auto;
+  gap: 1.5rem 2.2rem;
   width: 100%;
+  margin-bottom: 0.5rem;
 }
 
 .sample-choice-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid var(--glass-border);
-  padding: 2.5rem 3rem;
-  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 2px solid var(--glass-border);
+  padding: 1.6rem 2.8rem;
+  border-radius: 20px;
   display: flex;
   align-items: center;
-  gap: 2.2rem;
-  transition: transform 0.3s ease;
+  gap: 2.4rem;
+  transition: all 0.3s ease;
+  min-height: 120px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 }
 
 .sample-choice-letter {
-  width: 64px;
-  height: 64px;
+  width: 110px;
+  height: 110px;
+  min-width: 110px;
   background: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2.2rem;
-  font-weight: 700;
+  font-family: var(--font-title);
+  font-size: 4.6rem;
+  font-weight: 900;
   color: #fff;
   flex-shrink: 0;
 }
 
 .sample-choice-text {
-  font-size: 2.8rem;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: clamp(3.6rem, 4.5vw, 4.8rem);
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.3;
 }
 
 .sample-choice-card.correct {
-  background: rgba(0, 230, 118, 0.08) !important;
+  background: rgba(0, 230, 118, 0.14) !important;
   border-color: var(--color-success) !important;
-  box-shadow: 0 0 20px rgba(0, 230, 118, 0.15);
-  transform: scale(1.03);
+  box-shadow: 0 0 25px rgba(0, 230, 118, 0.35);
+  transform: scale(1.02);
 }
 
 .sample-choice-card.correct .sample-choice-letter {
   background: var(--color-success) !important;
   color: #052e16 !important;
+  border-color: var(--color-success) !important;
 }
 
 .sample-choice-card.incorrect {
@@ -1841,46 +1867,50 @@ const handlePageClick = () => {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 6rem 3rem;
-  min-height: 70vh;
+  padding: 4rem 3rem 5rem 3rem;
+  min-height: calc(100vh - 7rem);
+  flex: 1;
+  height: 100%;
   animation: fadeIn 0.5s ease-out;
+  gap: 2.5rem;
 }
 
 .get-ready-title {
   font-family: var(--font-title);
-  font-size: 6.2rem;
-  font-weight: 800;
+  font-size: clamp(6.0rem, 7.5vw, 8.5rem);
+  font-weight: 900;
   background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 20px rgba(0, 229, 255, 0.15));
-  margin-bottom: 2rem;
+  filter: drop-shadow(0 0 25px rgba(0, 229, 255, 0.2));
+  margin-bottom: 1rem;
 }
 
 .get-ready-subtitle {
-  font-size: 3.4rem;
+  font-size: clamp(3.6rem, 4.5vw, 5.0rem);
+  font-weight: 700;
   color: var(--text-secondary);
-  margin-bottom: 5rem;
+  margin-bottom: 2rem;
 }
 
 .get-ready-waiting-box {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1.8rem;
-  font-size: 2.8rem;
+  gap: 2.2rem;
+  font-size: clamp(3.0rem, 3.8vw, 4.2rem);
   color: var(--color-cyan);
-  font-weight: 600;
-  background: rgba(0, 229, 255, 0.04);
-  border: 1px solid rgba(0, 229, 255, 0.15);
-  padding: 2rem 4rem;
-  border-radius: 50px;
-  box-shadow: 0 0 20px rgba(0, 229, 255, 0.05);
+  font-weight: 700;
+  background: rgba(0, 229, 255, 0.05);
+  border: 2px solid rgba(0, 229, 255, 0.3);
+  padding: 2.5rem 5rem;
+  border-radius: 60px;
+  box-shadow: 0 0 35px rgba(0, 229, 255, 0.15);
 }
 
 .get-ready-waiting-box .pulse-ring {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
 }
 
 /* Light theme tweaks for pre-competition */
@@ -1889,17 +1919,34 @@ const handlePageClick = () => {
   filter: drop-shadow(0 0 10px rgba(0, 172, 193, 0.1));
 }
 
+.light-theme .welcome-subtitle {
+  color: #0f172a !important;
+}
+
+.light-theme .welcome-org-name {
+  color: #475569 !important;
+}
+
+.light-theme .welcome-date {
+  color: #0f172a !important;
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.18) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+}
+
 .light-theme .rules-content-card {
-  background: rgba(255, 255, 255, 0.95);
-  border-color: rgba(15, 23, 42, 0.06);
+  background: #ffffff !important;
+  border-color: rgba(15, 23, 42, 0.15) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
 }
 
 .light-theme .rule-text {
-  color: #0f172a;
+  color: #0f172a !important;
 }
 
 .light-theme .sample-q-text {
-  color: #0f172a;
+  color: #0f172a !important;
+  filter: none;
 }
 
 .light-theme .sample-choice-card {
@@ -1918,110 +1965,139 @@ const handlePageClick = () => {
   color: #0f172a !important;
 }
 
+.light-theme .sample-choice-card.correct {
+  background: rgba(0, 230, 118, 0.15) !important;
+  border-color: var(--color-success) !important;
+  box-shadow: 0 0 25px rgba(0, 230, 118, 0.25);
+}
+
+.light-theme .sample-choice-card.correct .sample-choice-letter {
+  background: var(--color-success) !important;
+  color: #ffffff !important;
+  border-color: var(--color-success) !important;
+}
+
+.light-theme .sample-choice-card.correct .sample-choice-text {
+  color: #052e16 !important;
+}
+
 .light-theme .get-ready-subtitle {
-  color: #475569;
+  color: #475569 !important;
 }
 
 .light-theme .get-ready-waiting-box {
-  background: rgba(0, 172, 193, 0.04);
-  border-color: rgba(0, 172, 193, 0.15);
+  background: rgba(0, 172, 193, 0.06);
+  border-color: rgba(0, 172, 193, 0.3);
   color: var(--color-cyan);
+  box-shadow: 0 4px 20px rgba(0, 172, 193, 0.1);
 }
 
 @media (max-height: 900px) or (min-aspect-ratio: 1.8/1) {
   .rules-container, .sample-q-container, .get-ready-container {
-    padding: 3rem 2rem;
-    min-height: 60vh;
+    padding: 2.5rem 2rem 3.5rem 2rem;
+    min-height: calc(100vh - 5rem);
+    gap: 1.5rem;
   }
   .rules-title, .get-ready-title {
-    font-size: 4.8rem;
-    margin-bottom: 2rem;
+    font-size: clamp(4.8rem, 5.8vw, 6.5rem);
+    margin-bottom: 1rem;
   }
   .rules-content-card {
     padding: 3.5rem 5rem;
-    gap: 2rem;
+    gap: 2.5rem;
+  }
+  .rule-icon {
+    font-size: 4.2rem;
   }
   .rule-text {
-    font-size: 2.4rem;
+    font-size: 2.8rem;
   }
   .highlight-yellow, .highlight-cyan {
-    font-size: 3rem;
+    font-size: 3.4rem;
   }
   .sample-badge {
-    font-size: 1.4rem;
+    font-size: 1.6rem;
+    padding: 0.5rem 2rem;
   }
   .sample-q-text {
-    font-size: 3.4rem;
-    margin-bottom: 3rem;
+    font-size: clamp(3.4rem, 4.2vw, 4.8rem);
+    margin-bottom: 1rem;
   }
   .sample-choice-card {
-    padding: 1.8rem 2rem;
-    gap: 1.5rem;
+    padding: 1.1rem 2rem;
+    gap: 1.8rem;
+    min-height: 95px;
   }
   .sample-choice-letter {
-    width: 52px;
-    height: 52px;
-    font-size: 1.8rem;
+    width: 90px;
+    height: 90px;
+    min-width: 90px;
+    font-size: 3.8rem;
   }
   .sample-choice-text {
-    font-size: 2rem;
+    font-size: clamp(3.0rem, 3.6vw, 3.8rem);
   }
   .get-ready-subtitle {
-    font-size: 2.4rem;
-    margin-bottom: 3rem;
+    font-size: 2.8rem;
+    margin-bottom: 1.5rem;
   }
   .get-ready-waiting-box {
-    font-size: 2rem;
-    padding: 1.2rem 2.5rem;
+    font-size: 2.6rem;
+    padding: 1.6rem 3.5rem;
   }
 }
 
 @media (max-height: 720px) {
   .rules-container, .sample-q-container, .get-ready-container {
-    padding: 1.5rem 1rem;
-    min-height: 50vh;
+    padding: 1.5rem 1.2rem 2.5rem 1.2rem;
+    min-height: calc(100vh - 3.5rem);
+    gap: 1rem;
   }
   .rules-title, .get-ready-title {
-    font-size: 3.6rem;
-    margin-bottom: 1.5rem;
+    font-size: 4.0rem;
+    margin-bottom: 0.8rem;
   }
   .rules-content-card {
     padding: 2.5rem 3rem;
-    gap: 1.5rem;
+    gap: 1.8rem;
+  }
+  .rule-icon {
+    font-size: 3.2rem;
   }
   .rule-text {
-    font-size: 1.8rem;
-  }
-  .highlight-yellow, .highlight-cyan {
     font-size: 2.2rem;
   }
+  .highlight-yellow, .highlight-cyan {
+    font-size: 2.6rem;
+  }
   .sample-badge {
-    font-size: 1.2rem;
-    margin-bottom: 1.5rem;
+    font-size: 1.3rem;
   }
   .sample-q-text {
-    font-size: 2.6rem;
-    margin-bottom: 2rem;
+    font-size: 3.0rem;
+    margin-bottom: 0.8rem;
   }
   .sample-choice-card {
-    padding: 1.2rem 1.5rem;
-    gap: 1.2rem;
+    padding: 0.8rem 1.6rem;
+    gap: 1.4rem;
+    min-height: 80px;
   }
   .sample-choice-letter {
-    width: 44px;
-    height: 44px;
-    font-size: 1.4rem;
+    width: 72px;
+    height: 72px;
+    min-width: 72px;
+    font-size: 2.8rem;
   }
   .sample-choice-text {
-    font-size: 1.6rem;
+    font-size: 2.6rem;
   }
   .get-ready-subtitle {
-    font-size: 1.8rem;
-    margin-bottom: 2rem;
+    font-size: 2.2rem;
+    margin-bottom: 1rem;
   }
   .get-ready-waiting-box {
-    font-size: 1.6rem;
-    padding: 1rem 2rem;
+    font-size: 2.0rem;
+    padding: 1.2rem 2.5rem;
   }
 }
 </style>
