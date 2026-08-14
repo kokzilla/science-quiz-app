@@ -1581,12 +1581,15 @@ const handlePageClick = () => {
   font-family: var(--font-title);
   font-size: clamp(6.0rem, 7.5vw, 9.0rem);
   font-weight: 900;
-  line-height: 1.2;
+  line-height: 1.35;
+  padding: 0.1em 0.15em 0.35em 0.15em;
+  display: inline-block;
   background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  background-clip: text;
   filter: drop-shadow(0 0 25px rgba(0, 229, 255, 0.2));
-  margin-bottom: 0.8rem;
+  margin-bottom: 0.5rem;
 }
 
 .welcome-subtitle {
@@ -1711,10 +1714,14 @@ const handlePageClick = () => {
   font-size: clamp(6.0rem, 7.5vw, 8.5rem);
   font-weight: 900;
   color: #fff;
-  margin-bottom: 2rem;
+  line-height: 1.35;
+  padding: 0.1em 0.15em 0.35em 0.15em;
+  display: inline-block;
+  margin-bottom: 1.5rem;
   background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  background-clip: text;
   filter: drop-shadow(0 0 25px rgba(0, 229, 255, 0.2));
 }
 
@@ -1879,11 +1886,15 @@ const handlePageClick = () => {
   font-family: var(--font-title);
   font-size: clamp(6.0rem, 7.5vw, 8.5rem);
   font-weight: 900;
+  line-height: 1.35;
+  padding: 0.1em 0.15em 0.35em 0.15em;
+  display: inline-block;
   background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  background-clip: text;
   filter: drop-shadow(0 0 25px rgba(0, 229, 255, 0.2));
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .get-ready-subtitle {
@@ -1914,9 +1925,14 @@ const handlePageClick = () => {
 }
 
 /* Light theme tweaks for pre-competition */
+.light-theme .welcome-title,
 .light-theme .rules-title,
 .light-theme .get-ready-title {
-  filter: drop-shadow(0 0 10px rgba(0, 172, 193, 0.1));
+  background: linear-gradient(135deg, #7c3aed, #0284c7) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  filter: drop-shadow(0 2px 8px rgba(124, 58, 237, 0.15)) !important;
 }
 
 .light-theme .welcome-subtitle {
