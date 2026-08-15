@@ -21,7 +21,9 @@ import {
   Mic,
   MicOff,
   Clock,
-  BookOpen
+  BookOpen,
+  Sun,
+  Moon
 } from 'lucide-vue-next'
 import type { Question, Answer, Team } from '~/types'
 
@@ -45,9 +47,10 @@ let configChannel: any = null
 let autoTimerTimeout: any = null
 const isLoaded = ref(false)
 
-// Audio settings refs
+// Audio & Theme settings refs
 const soundEnabled = ref(true)
 const ttsEnabled = ref(true)
+const presenterTheme = ref<'dark' | 'light'>('dark')
 
 const cleanupSubscriptions = () => {
   if (answersChannel && supabase.value) {
@@ -87,10 +90,19 @@ const sendAudioSettings = () => {
       event: 'audio_settings',
       payload: {
         soundEnabled: soundEnabled.value,
-        ttsEnabled: ttsEnabled.value
+        ttsEnabled: ttsEnabled.value,
+        presenterTheme: presenterTheme.value
       }
     })
   }
+}
+
+const togglePresenterTheme = () => {
+  presenterTheme.value = presenterTheme.value === 'dark' ? 'light' : 'dark'
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('presenter_theme', presenterTheme.value)
+  }
+  sendAudioSettings()
 }
 
 const toggleSound = () => {
@@ -172,6 +184,13 @@ onUnmounted(() => {
 })
 
 onMounted(async () => {
+  if (typeof window !== 'undefined') {
+    const savedTheme = localStorage.getItem('presenter_theme') as 'dark' | 'light' | null
+    if (savedTheme) {
+      presenterTheme.value = savedTheme
+    }
+  }
+
   const isValid = await validateAdminOnly()
   if (!isValid) return
   
@@ -347,8 +366,18 @@ const handleExit = () => {
             <div class="controller-header">
               <h2 class="section-title">2. ควบคุมหน้าจอเวทีรายข้อ</h2>
               
-              <!-- Audio Toggles -->
+              <!-- Audio & Theme Toggles -->
               <div class="audio-controls-group">
+                <button 
+                  @click="togglePresenterTheme" 
+                  class="btn toggle-audio-btn" 
+                  :class="presenterTheme === 'light' ? 'btn-primary' : 'btn-secondary'"
+                  :title="presenterTheme === 'dark' ? 'ธีมจอเวที (Presenter): โหมดมืด (คลิกเปลี่ยนเป็นสว่าง)' : 'ธีมจอเวที (Presenter): โหมดสว่าง (คลิกเปลี่ยนเป็นมืด)'"
+                >
+                  <Sun v-if="presenterTheme === 'light'" :size="14" />
+                  <Moon v-else :size="14" />
+                </button>
+
                 <button 
                   @click="toggleTts" 
                   class="btn toggle-audio-btn" 

@@ -32,6 +32,7 @@ const errorMsg = ref('')
 const audioReady = ref(false)
 const soundEnabled = ref(true)
 const ttsEnabled = ref(true) // TTS voice toggle state
+const presenterTheme = ref<'dark' | 'light'>('dark') // Presenter theme state
 let tickAudio: HTMLAudioElement | null = null
 let alarmAudio: HTMLAudioElement | null = null
 
@@ -71,6 +72,14 @@ onMounted(async () => {
     await fetchRounds()
   } else {
     loading.value = false
+  }
+
+  // Load initial saved theme if any
+  if (typeof window !== 'undefined') {
+    const savedTheme = localStorage.getItem('presenter_theme') as 'dark' | 'light' | null
+    if (savedTheme) {
+      presenterTheme.value = savedTheme
+    }
   }
 
   // Pre-load audio elements
@@ -384,12 +393,18 @@ const setupRealtimeSubscription = () => {
     })
     .subscribe()
 
-  // Listen to audio config broadcast channel
+  // Listen to audio & theme config broadcast channel
   configChannel = supabase.value.channel(`presenter-config-${selectedRoundId.value}`)
   configChannel
     .on('broadcast', { event: 'audio_settings' }, ({ payload }) => {
       soundEnabled.value = payload.soundEnabled
       ttsEnabled.value = payload.ttsEnabled
+      if (payload.presenterTheme) {
+        presenterTheme.value = payload.presenterTheme
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('presenter_theme', payload.presenterTheme)
+        }
+      }
     })
     .subscribe((status: string) => {
       if (status === 'SUBSCRIBED') {
@@ -616,7 +631,7 @@ const handlePageClick = () => {
 </script>
 
 <template>
-  <div class="presenter-view" @click="handlePageClick">
+  <div class="presenter-view" :class="{ 'light-theme': presenterTheme === 'light' }" @click="handlePageClick">
     
     <!-- Floating audio unlock banner/hint at the bottom -->
     <div 
@@ -1186,8 +1201,8 @@ const handlePageClick = () => {
 }
 
 .choice-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 2px solid var(--glass-border);
+  background: linear-gradient(135deg, rgba(24, 29, 56, 0.9), rgba(15, 18, 36, 0.9));
+  border: 2px solid rgba(255, 255, 255, 0.16);
   padding: 1.6rem 2.8rem;
   border-radius: 20px;
   display: flex;
@@ -1195,7 +1210,7 @@ const handlePageClick = () => {
   gap: 2.4rem;
   transition: all 0.3s ease;
   min-height: 120px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .choice-letter {
@@ -1249,7 +1264,8 @@ const handlePageClick = () => {
 }
 
 /* Light Theme tweaks */
-.light-theme .presenter-view {
+.light-theme .presenter-view,
+.light-theme.presenter-view {
   background: #f1f5f9;
   background-image: 
     radial-gradient(circle at 50% 0%, rgba(142, 36, 170, 0.04) 0%, transparent 70%),
@@ -1754,8 +1770,8 @@ const handlePageClick = () => {
 }
 
 .rules-content-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 2px solid var(--glass-border);
+  background: linear-gradient(135deg, rgba(24, 29, 56, 0.85), rgba(15, 18, 36, 0.85));
+  border: 2px solid rgba(255, 255, 255, 0.12);
   padding: 5rem 8rem;
   border-radius: 28px;
   box-shadow: var(--shadow-card);
@@ -1842,8 +1858,8 @@ const handlePageClick = () => {
 }
 
 .sample-choice-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 2px solid var(--glass-border);
+  background: linear-gradient(135deg, rgba(24, 29, 56, 0.9), rgba(15, 18, 36, 0.9));
+  border: 2px solid rgba(255, 255, 255, 0.16);
   padding: 1.6rem 2.8rem;
   border-radius: 20px;
   display: flex;
@@ -1851,7 +1867,7 @@ const handlePageClick = () => {
   gap: 2.4rem;
   transition: all 0.3s ease;
   min-height: 120px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .sample-choice-letter {
