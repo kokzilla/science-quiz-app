@@ -21,7 +21,8 @@ import {
   Database,
   Sliders,
   Presentation,
-  Pencil
+  Pencil,
+  Award
 } from 'lucide-vue-next'
 import type { Team, Question, ProgressSummary } from '~/types'
 
@@ -1020,6 +1021,11 @@ const handleCSVImport = async (event: Event) => {
           <NuxtLink :to="`/presenter-admin?round=${currentRound.id}`" target="_blank" class="btn btn-primary portal-link control-led-link">
             <Sliders :size="16" />
             <span>แผงควบคุมจอเวที</span>
+          </NuxtLink>
+
+          <NuxtLink :to="`/winner-settings?round=${currentRound.id}`" target="_blank" class="btn btn-primary portal-link winner-settings-link">
+            <Award :size="16" />
+            <span>ตั้งค่าประกาศผู้ชนะ</span>
           </NuxtLink>
 
           <button @click="handleDeleteRound" class="btn btn-danger delete-round-btn">

@@ -6,8 +6,14 @@ export interface Round {
   status: 'pending' | 'active' | 'completed'
   revealed_question_number: number
   presenter_active_question: number
-  presenter_show_state: 'welcome' | 'sample_question' | 'question' | 'timer_start' | 'answer_revealed' | 'correct_teams'
+  presenter_show_state: 'welcome' | 'sample_question' | 'sample_answer' | 'rules' | 'get_ready' | 'question' | 'timer_start' | 'answer_revealed' | 'correct_teams' | 'winners'
   presenter_timer_started_at: string | null
+  presenter_theme?: 'dark' | 'light' | null
+  winner_data?: {
+    rank1?: Team[]
+    rank2?: Team[]
+    rank3?: Team[]
+  } | null
   created_at?: string
 }
 

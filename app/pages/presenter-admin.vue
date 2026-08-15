@@ -68,41 +68,69 @@ const cleanupSubscriptions = () => {
 }
 
 const setupConfigChannel = () => {
-  if (!supabase.value || !selectedRoundId.value) return
+  if (!supabase.value) return
   
   if (configChannel) {
     supabase.value.removeChannel(configChannel)
     configChannel = null
   }
   
-  configChannel = supabase.value.channel(`presenter-config-${selectedRoundId.value}`)
+  configChannel = supabase.value.channel('presenter-global-config', {
+    config: { broadcast: { self: true } }
+  })
   configChannel
     .on('broadcast', { event: 'request_audio_settings' }, () => {
       sendAudioSettings()
     })
-    .subscribe()
+    .subscribe((status: string) => {
+      if (status === 'SUBSCRIBED') {
+        sendAudioSettings()
+      }
+    })
 }
 
 const sendAudioSettings = () => {
+  const payload = {
+    soundEnabled: soundEnabled.value,
+    ttsEnabled: ttsEnabled.value,
+    presenterTheme: presenterTheme.value
+  }
+
   if (configChannel) {
     configChannel.send({
       type: 'broadcast',
       event: 'audio_settings',
-      payload: {
-        soundEnabled: soundEnabled.value,
-        ttsEnabled: ttsEnabled.value,
-        presenterTheme: presenterTheme.value
-      }
+      payload
     })
+  }
+
+  if (typeof window !== 'undefined' && ('BroadcastChannel' in window)) {
+    try {
+      const bc = new BroadcastChannel('presenter_config_channel')
+      bc.postMessage({ event: 'audio_settings', payload })
+      setTimeout(() => bc.close(), 200)
+    } catch (e) {}
   }
 }
 
-const togglePresenterTheme = () => {
+const togglePresenterTheme = async () => {
   presenterTheme.value = presenterTheme.value === 'dark' ? 'light' : 'dark'
   if (typeof window !== 'undefined') {
     localStorage.setItem('presenter_theme', presenterTheme.value)
   }
   sendAudioSettings()
+
+  if (supabase.value && currentRound.value?.id) {
+    try {
+      await supabase.value.rpc('update_presenter_theme_secure', {
+        p_round_id: currentRound.value.id,
+        p_presenter_theme: presenterTheme.value,
+        p_passkey: adminPasskey.value
+      })
+    } catch (e) {
+      console.error('Error updating presenter theme in DB:', e)
+    }
+  }
 }
 
 const toggleSound = () => {
@@ -157,6 +185,9 @@ const onRoundChanged = async (roundId: string) => {
       .channel('presenter-admin-round')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rounds', filter: `id=eq.${roundId}` }, (payload: any) => {
         currentRound.value = payload.new
+        if (payload.new?.presenter_theme) {
+          presenterTheme.value = payload.new.presenter_theme
+        }
       })
       .subscribe()
       
@@ -190,6 +221,8 @@ onMounted(async () => {
       presenterTheme.value = savedTheme
     }
   }
+
+  setupConfigChannel()
 
   const isValid = await validateAdminOnly()
   if (!isValid) return
@@ -290,6 +323,10 @@ const handleExit = () => {
           <Tv :size="16" />
           <span>เปิดจอ LED ใหญ่</span>
         </NuxtLink>
+        <NuxtLink :to="`/winner-settings?round=${selectedRoundId}`" target="_blank" class="btn btn-primary winner-btn">
+          <Award :size="16" />
+          <span>ตั้งค่าประกาศผู้ชนะ</span>
+        </NuxtLink>
         <button @click="handleExit" class="btn btn-secondary exit-btn">
           <LogOut :size="16" />
           <span>กลับหน้าแรก</span>
@@ -317,7 +354,7 @@ const handleExit = () => {
           
           <!-- Card 1: Setup & Intro (ก่อนเริ่มแข่งขัน - ย่อเล็ก) -->
           <div class="glass-card setup-card">
-            <h3 class="card-subtitle">1. เตรียมตัวก่อนแข่ง (กดครั้งเดียว)</h3>
+            <h3 class="card-subtitle">1. เตรียมตัวก่อนแข่ง / ประกาศผล</h3>
             <div class="setup-buttons-grid">
               <button 
                 @click="updatePresenterState(1, 'welcome')" 
@@ -357,6 +394,14 @@ const handleExit = () => {
                 :class="{ active: currentRound.presenter_show_state === 'get_ready' }"
               >
                 5. เตรียมแข่ง
+              </button>
+
+              <button 
+                @click="updatePresenterState(currentRound.presenter_active_question || 1, 'winners')" 
+                class="btn btn-primary btn-setup winner-setup-btn" 
+                :class="{ active: currentRound.presenter_show_state === 'winners' }"
+              >
+                🏆 6. ประกาศผู้ชนะ 1-3
               </button>
             </div>
           </div>

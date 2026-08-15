@@ -45,6 +45,223 @@ let timerInterval: any = null
 let roundChannel: any = null
 let answersChannel: any = null
 let configChannel: any = null
+let localConfigBc: any = null
+
+const applyConfigPayload = (payload: any) => {
+  if (!payload) return
+  if (typeof payload.soundEnabled === 'boolean') soundEnabled.value = payload.soundEnabled
+  if (typeof payload.ttsEnabled === 'boolean') ttsEnabled.value = payload.ttsEnabled
+  if (payload.presenterTheme === 'light' || payload.presenterTheme === 'dark') {
+    presenterTheme.value = payload.presenterTheme
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('presenter_theme', payload.presenterTheme)
+    }
+  }
+}
+
+// Fireworks Animation System
+const fireworksCanvas = ref<HTMLCanvasElement | null>(null)
+let fireworksAnimationId: number | null = null
+let fireworksLaunchInterval: any = null
+
+interface FireworkParticle {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  color: string
+  size: number
+  alpha: number
+  decay: number
+  gravity: number
+  drag: number
+  flicker: boolean
+}
+
+interface FireworkRocket {
+  x: number
+  y: number
+  vx: number
+  vy: number
+  targetY: number
+  color: string
+  trail: { x: number; y: number; alpha: number }[]
+  exploded: boolean
+}
+
+const fwColors = [
+  '#FFD700', // Gold
+  '#FFA500', // Orange
+  '#00E5FF', // Cyan
+  '#FF2E93', // Neon Pink
+  '#00FF88', // Emerald Neon
+  '#A855F7', // Violet
+  '#FF4500', // Red-Orange
+  '#FFFFFF', // Pure White
+  '#38BDF8'  // Sky Blue
+]
+
+let particles: FireworkParticle[] = []
+let rockets: FireworkRocket[] = []
+
+const createExplosion = (x: number, y: number, color: string) => {
+  const count = 55 + Math.floor(Math.random() * 35)
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4
+    const speed = 2.5 + Math.random() * 6.5
+    particles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      color: Math.random() > 0.3 ? color : fwColors[Math.floor(Math.random() * fwColors.length)],
+      size: 2.2 + Math.random() * 2.5,
+      alpha: 1,
+      decay: 0.012 + Math.random() * 0.018,
+      gravity: 0.07,
+      drag: 0.955,
+      flicker: Math.random() > 0.5
+    })
+  }
+}
+
+const launchRocket = () => {
+  if (!fireworksCanvas.value) return
+  const w = fireworksCanvas.value.width
+  const h = fireworksCanvas.value.height
+  const startX = w * 0.12 + Math.random() * (w * 0.76)
+  const targetY = h * 0.10 + Math.random() * (h * 0.40)
+  const color = fwColors[Math.floor(Math.random() * fwColors.length)]
+  const speed = 12 + Math.random() * 5
+
+  rockets.push({
+    x: startX,
+    y: h,
+    vx: (Math.random() - 0.5) * 3,
+    vy: -speed,
+    targetY,
+    color,
+    trail: [],
+    exploded: false
+  })
+}
+
+const updateFireworks = () => {
+  if (!fireworksCanvas.value) return
+  const ctx = fireworksCanvas.value.getContext('2d')
+  if (!ctx) return
+
+  ctx.clearRect(0, 0, fireworksCanvas.value.width, fireworksCanvas.value.height)
+
+  // Update & draw rockets
+  for (let i = rockets.length - 1; i >= 0; i--) {
+    const r = rockets[i]
+    r.trail.push({ x: r.x, y: r.y, alpha: 1 })
+    if (r.trail.length > 7) r.trail.shift()
+
+    // Draw rocket trail
+    for (let t = 0; t < r.trail.length; t++) {
+      const point = r.trail[t]
+      ctx.beginPath()
+      ctx.arc(point.x, point.y, 2.2, 0, Math.PI * 2)
+      ctx.fillStyle = r.color
+      ctx.globalAlpha = (t / r.trail.length) * 0.7
+      ctx.fill()
+    }
+
+    r.x += r.vx
+    r.y += r.vy
+    r.vy += 0.15 // slight deceleration
+
+    // Check if reached target
+    if (r.y <= r.targetY || r.vy >= -1) {
+      createExplosion(r.x, r.y, r.color)
+      rockets.splice(i, 1)
+    }
+  }
+
+  // Update & draw particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i]
+    p.vx *= p.drag
+    p.vy *= p.drag
+    p.vy += p.gravity
+    p.x += p.vx
+    p.y += p.vy
+    p.alpha -= p.decay
+
+    if (p.alpha <= 0) {
+      particles.splice(i, 1)
+      continue
+    }
+
+    ctx.save()
+    ctx.globalAlpha = p.flicker && Math.random() > 0.4 ? p.alpha * 0.6 : p.alpha
+    ctx.fillStyle = p.color
+    ctx.shadowBlur = 12
+    ctx.shadowColor = p.color
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, p.size * p.alpha, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+
+  if (currentRound.value?.presenter_show_state === 'winners') {
+    fireworksAnimationId = requestAnimationFrame(updateFireworks)
+  }
+}
+
+const resizeFireworksCanvas = () => {
+  if (fireworksCanvas.value && typeof window !== 'undefined') {
+    fireworksCanvas.value.width = window.innerWidth
+    fireworksCanvas.value.height = window.innerHeight
+  }
+}
+
+const startFireworks = () => {
+  if (typeof window === 'undefined') return
+  stopFireworks()
+  resizeFireworksCanvas()
+
+  // Initial burst of 4 fireworks
+  setTimeout(() => {
+    launchRocket()
+    launchRocket()
+  }, 100)
+  setTimeout(() => {
+    launchRocket()
+    launchRocket()
+  }, 450)
+
+  // Continuous auto-launch
+  fireworksLaunchInterval = setInterval(() => {
+    if (currentRound.value?.presenter_show_state === 'winners') {
+      launchRocket()
+      if (Math.random() > 0.35) {
+        setTimeout(launchRocket, 180 + Math.random() * 260)
+      }
+    }
+  }, 700)
+
+  fireworksAnimationId = requestAnimationFrame(updateFireworks)
+}
+
+const stopFireworks = () => {
+  if (fireworksAnimationId) {
+    cancelAnimationFrame(fireworksAnimationId)
+    fireworksAnimationId = null
+  }
+  if (fireworksLaunchInterval) {
+    clearInterval(fireworksLaunchInterval)
+    fireworksLaunchInterval = null
+  }
+  rockets = []
+  particles = []
+  if (fireworksCanvas.value) {
+    const ctx = fireworksCanvas.value.getContext('2d')
+    if (ctx) ctx.clearRect(0, 0, fireworksCanvas.value.width, fireworksCanvas.value.height)
+  }
+}
 
 // Question Intro state
 const showQuestionIntro = ref(false)
@@ -74,11 +291,32 @@ onMounted(async () => {
     loading.value = false
   }
 
-  // Load initial saved theme if any
+  // Load initial saved theme if any and listen to local cross-tab broadcasts
   if (typeof window !== 'undefined') {
     const savedTheme = localStorage.getItem('presenter_theme') as 'dark' | 'light' | null
     if (savedTheme) {
       presenterTheme.value = savedTheme
+    }
+
+    if ('BroadcastChannel' in window) {
+      try {
+        localConfigBc = new BroadcastChannel('presenter_config_channel')
+        localConfigBc.onmessage = (msg: MessageEvent) => {
+          if (msg.data && msg.data.event === 'audio_settings' && msg.data.payload) {
+            applyConfigPayload(msg.data.payload)
+          }
+        }
+      } catch (e) {}
+    }
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === 'presenter_theme' && (e.newValue === 'light' || e.newValue === 'dark')) {
+        presenterTheme.value = e.newValue
+      }
+    })
+    window.addEventListener('resize', resizeFireworksCanvas)
+    if (currentRound.value?.presenter_show_state === 'winners') {
+      startFireworks()
     }
   }
 
@@ -99,10 +337,25 @@ onMounted(async () => {
   }
 })
 
+watch(
+  () => currentRound.value?.presenter_show_state,
+  (newState) => {
+    if (newState === 'winners') {
+      startFireworks()
+    } else {
+      stopFireworks()
+    }
+  }
+)
+
 onUnmounted(() => {
   cleanupSubscriptions()
   stopLocalTimer()
   stopSounds()
+  stopFireworks()
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', resizeFireworksCanvas)
+  }
 })
 
 const fetchRounds = async () => {
@@ -141,6 +394,9 @@ const loadPresentationState = async () => {
 
     if (rErr) throw rErr
     currentRound.value = rData
+    if (rData?.presenter_theme === 'light' || rData?.presenter_theme === 'dark') {
+      presenterTheme.value = rData.presenter_theme
+    }
 
     // 2. Fetch all teams in round (for calculations)
     const { data: tData } = await supabase.value
@@ -271,6 +527,46 @@ const speakCorrectTeams = () => {
   }, 150)
 }
 
+const winnerData = computed(() => {
+  if (!currentRound.value?.winner_data) return { rank1: [], rank2: [], rank3: [] }
+  const wd = currentRound.value.winner_data
+  return {
+    rank1: wd.rank1 || [],
+    rank2: wd.rank2 || [],
+    rank3: wd.rank3 || []
+  }
+})
+
+const formatSchoolName = (schoolName?: string) => {
+  if (!schoolName) return ''
+  const trimmed = schoolName.trim()
+  if (trimmed.startsWith('โรงเรียน')) return trimmed
+  return `โรงเรียน${trimmed}`
+}
+
+const speakWinnersAnnouncement = () => {
+  if (!ttsEnabled.value || typeof window === 'undefined' || !('speechSynthesis' in window)) return
+  window.speechSynthesis.cancel()
+
+  const rank1 = winnerData.value.rank1 || []
+  let text = `ขอแสดงความยินดีกับผู้ชนะเลิศการแข่งขันประจำรอบ ${currentRound.value?.name || ''} `
+  if (rank1.length > 0) {
+    const names = rank1.map((t: any) => `${t.name} ${t.school_name ? formatSchoolName(t.school_name) : ''}`)
+    text += `ทีมชนะเลิศ อันดับ 1 ได้แก่ ${names.join(' และ ')} ครับ`
+  }
+
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = 'th-TH'
+  const maleVoice = getThaiMaleVoice()
+  if (maleVoice) utterance.voice = maleVoice
+  utterance.volume = soundEnabled.value ? 1.0 : 0.0
+  utterance.rate = 0.95
+
+  setTimeout(() => {
+    window.speechSynthesis.speak(utterance)
+  }, 300)
+}
+
 const speakQuestionStart = (qNum: number) => {
   if (!ttsEnabled.value || typeof window === 'undefined' || !('speechSynthesis' in window)) return
 
@@ -369,6 +665,10 @@ const setupRealtimeSubscription = () => {
       const prevShowState = currentRound.value?.presenter_show_state
       currentRound.value = payload.new
 
+      if (payload.new?.presenter_theme === 'light' || payload.new?.presenter_theme === 'dark') {
+        presenterTheme.value = payload.new.presenter_theme
+      }
+
       // If active question changed, fetch new question details
       if (payload.new.presenter_active_question !== prevActiveQ) {
         if (payload.new.presenter_show_state === 'question') {
@@ -383,28 +683,27 @@ const setupRealtimeSubscription = () => {
         }
       }
 
+      if (payload.new.presenter_show_state === 'winners' && payload.old?.presenter_show_state !== 'winners') {
+        speakWinnersAnnouncement()
+      }
+
       // Sync timer and sounds
       syncTimerState()
 
       // Cancel TTS speech if we moved away from speaking states
-      if (payload.new.presenter_show_state !== 'correct_teams' && payload.new.presenter_show_state !== 'question' && typeof window !== 'undefined' && ('speechSynthesis' in window)) {
+      if (payload.new.presenter_show_state !== 'correct_teams' && payload.new.presenter_show_state !== 'question' && payload.new.presenter_show_state !== 'winners' && typeof window !== 'undefined' && ('speechSynthesis' in window)) {
         window.speechSynthesis.cancel()
       }
     })
     .subscribe()
 
-  // Listen to audio & theme config broadcast channel
-  configChannel = supabase.value.channel(`presenter-config-${selectedRoundId.value}`)
+  // Listen to audio & theme config broadcast channel (Global topic)
+  configChannel = supabase.value.channel('presenter-global-config', {
+    config: { broadcast: { self: true } }
+  })
   configChannel
-    .on('broadcast', { event: 'audio_settings' }, ({ payload }) => {
-      soundEnabled.value = payload.soundEnabled
-      ttsEnabled.value = payload.ttsEnabled
-      if (payload.presenterTheme) {
-        presenterTheme.value = payload.presenterTheme
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('presenter_theme', payload.presenterTheme)
-        }
-      }
+    .on('broadcast', { event: 'audio_settings' }, ({ payload }: any) => {
+      applyConfigPayload(payload)
     })
     .subscribe((status: string) => {
       if (status === 'SUBSCRIBED') {
@@ -422,6 +721,10 @@ const cleanupSubscriptions = () => {
   if (configChannel) {
     supabase.value?.removeChannel(configChannel)
     configChannel = null
+  }
+  if (localConfigBc) {
+    try { localConfigBc.close() } catch (e) {}
+    localConfigBc = null
   }
 }
 
@@ -633,6 +936,13 @@ const handlePageClick = () => {
 <template>
   <div class="presenter-view" :class="{ 'light-theme': presenterTheme === 'light' }" @click="handlePageClick">
     
+    <!-- Fireworks Canvas Overlay (Active during Winner Announcement) -->
+    <canvas 
+      ref="fireworksCanvas" 
+      class="fireworks-canvas"
+      v-show="currentRound?.presenter_show_state === 'winners'"
+    ></canvas>
+    
     <!-- Floating audio unlock banner/hint at the bottom -->
     <div 
       v-if="!audioReady" 
@@ -838,6 +1148,83 @@ const handlePageClick = () => {
             >
               {{ team.team_number }}
             </div>
+          </div>
+        </div>
+
+        <!-- 1.5 WINNER ANNOUNCEMENT 3-PODIUM STAGE SCREEN -->
+        <div v-else-if="currentRound.presenter_show_state === 'winners'" class="presenter-card winners-stage-container">
+          <div class="winners-stage-header">
+            <h1 class="winners-congrats-title font-title">
+              <Award :size="48" class="text-gold winner-trophy-icon" />
+              <span>ขอแสดงความยินดี</span>
+              <Award :size="48" class="text-gold winner-trophy-icon" />
+            </h1>
+            <h2 class="winners-event-subtitle">
+              การแข่งขันตอบปัญหาวิทยาศาสตร์ มหาวิทยาลัยราชภัฏบุรีรัมย์
+            </h2>
+            <div class="winners-round-meta">
+              <span>ระดับ {{ currentRound.name }}</span>
+              <span v-if="currentRound.round_date || currentRound.date" class="winners-date-text">
+                วันที่ {{ currentRound.round_date || currentRound.date }}
+              </span>
+            </div>
+          </div>
+
+          <!-- 3 Podiums Container -->
+          <div class="podiums-stage-grid">
+            
+            <!-- PODIUM 2 (LEFT - SILVER - 2ND PLACE) -->
+            <div class="podium-col silver-col">
+              <div class="podium-teams-cards">
+                <div v-if="!winnerData.rank2 || winnerData.rank2.length === 0" class="no-winner-slot">
+                  - ไม่ระบุ -
+                </div>
+                <div v-for="team in winnerData.rank2" :key="team.id" class="podium-team-card silver-card">
+                  <div class="podium-team-name-line">{{ team.name }}</div>
+                  <div v-if="team.school_name" class="podium-team-school-line">{{ formatSchoolName(team.school_name) }}</div>
+                </div>
+              </div>
+              <div class="podium-pillar silver-pillar">
+                <div class="pillar-rank-badge">🥈</div>
+                <div class="pillar-rank-title">รองชนะเลิศ อันดับ 1</div>
+              </div>
+            </div>
+
+            <!-- PODIUM 1 (CENTER - GOLD - 1ST PLACE HIGHEST) -->
+            <div class="podium-col gold-col">
+              <div class="podium-crown-icon">👑</div>
+              <div class="podium-teams-cards">
+                <div v-if="!winnerData.rank1 || winnerData.rank1.length === 0" class="no-winner-slot">
+                  - ไม่ระบุ -
+                </div>
+                <div v-for="team in winnerData.rank1" :key="team.id" class="podium-team-card gold-card">
+                  <div class="podium-team-name-line">{{ team.name }}</div>
+                  <div v-if="team.school_name" class="podium-team-school-line">{{ formatSchoolName(team.school_name) }}</div>
+                </div>
+              </div>
+              <div class="podium-pillar gold-pillar">
+                <div class="pillar-rank-badge">🥇</div>
+                <div class="pillar-rank-title">ชนะเลิศ (อันดับ 1)</div>
+              </div>
+            </div>
+
+            <!-- PODIUM 3 (RIGHT - BRONZE - 3RD PLACE) -->
+            <div class="podium-col bronze-col">
+              <div class="podium-teams-cards">
+                <div v-if="!winnerData.rank3 || winnerData.rank3.length === 0" class="no-winner-slot">
+                  - ไม่ระบุ -
+                </div>
+                <div v-for="team in winnerData.rank3" :key="team.id" class="podium-team-card bronze-card">
+                  <div class="podium-team-name-line">{{ team.name }}</div>
+                  <div v-if="team.school_name" class="podium-team-school-line">{{ formatSchoolName(team.school_name) }}</div>
+                </div>
+              </div>
+              <div class="podium-pillar bronze-pillar">
+                <div class="pillar-rank-badge">🥉</div>
+                <div class="pillar-rank-title">รองชนะเลิศ อันดับ 2</div>
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -2165,5 +2552,249 @@ const handlePageClick = () => {
     font-size: 2.0rem;
     padding: 1.2rem 2.5rem;
   }
+}
+
+/* Fireworks Canvas Overlay */
+.fireworks-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 99;
+}
+
+/* Winner Podium Stage Styles */
+.winners-stage-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 1rem 2rem 2rem 2rem;
+  justify-content: space-between;
+  text-align: center;
+  position: relative;
+  z-index: 20;
+}
+
+.winners-stage-header {
+  margin-bottom: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.winners-congrats-title {
+  font-size: clamp(2.4rem, 4.2vw, 3.8rem);
+  font-weight: 900;
+  color: var(--color-gold, #ffd700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  text-shadow: 0 0 25px rgba(255, 215, 0, 0.45);
+  margin: 0;
+}
+
+.winners-event-subtitle {
+  font-size: clamp(1.2rem, 1.8vw, 1.65rem);
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  opacity: 0.95;
+}
+
+.winners-round-meta {
+  font-size: clamp(1.2rem, 1.8vw, 1.65rem);
+  font-weight: 600;
+  color: var(--color-cyan, #00e5ff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.winners-date-text {
+  color: var(--color-cyan, #00e5ff);
+}
+
+.podiums-stage-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  gap: 1.5rem;
+  align-items: flex-end;
+  flex: 1;
+  padding: 0.5rem 0;
+}
+
+.podium-col {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+  position: relative;
+}
+
+.gold-col {
+  z-index: 10;
+}
+
+.podium-crown-icon {
+  font-size: clamp(3.5rem, 5vw, 5.2rem);
+  margin-bottom: 0.5rem;
+  filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.6));
+  animation: bounceCrown 2s infinite ease-in-out;
+}
+
+@keyframes bounceCrown {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* Horizontal Row layout for tied teams (left to right) */
+.podium-teams-cards {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  width: 100%;
+}
+
+.no-winner-slot {
+  font-size: 1rem;
+  color: #64748b;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0.75rem;
+  width: 100%;
+}
+
+.podium-team-card {
+  flex: 1;
+  min-width: 160px;
+  max-width: 320px;
+  padding: 0.85rem 1.15rem;
+  border-radius: 0.85rem;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.gold-card {
+  background: linear-gradient(135deg, rgba(234, 179, 8, 0.3) 0%, rgba(255, 215, 0, 0.15) 100%);
+  border: 2px solid rgba(255, 215, 0, 0.7);
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.35);
+}
+
+.silver-card {
+  background: linear-gradient(135deg, rgba(226, 232, 240, 0.25) 0%, rgba(148, 163, 184, 0.15) 100%);
+  border: 2px solid rgba(226, 232, 240, 0.6);
+  box-shadow: 0 0 20px rgba(226, 232, 240, 0.25);
+}
+
+.bronze-card {
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.25) 0%, rgba(217, 119, 6, 0.15) 100%);
+  border: 2px solid rgba(251, 146, 60, 0.6);
+  box-shadow: 0 0 20px rgba(251, 146, 60, 0.25);
+}
+
+.podium-team-num {
+  font-weight: 900;
+  font-size: 0.95rem;
+  color: var(--color-cyan, #00e5ff);
+  font-family: var(--font-title);
+}
+
+.podium-team-name-line {
+  font-weight: 800;
+  font-size: clamp(1.2rem, 1.8vw, 1.7rem);
+  color: #ffffff;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.podium-team-school-line {
+  font-size: clamp(0.9rem, 1.2vw, 1.25rem);
+  color: #e2e8f0;
+  opacity: 0.95;
+  line-height: 1.3;
+  margin-top: 0.25rem;
+  word-break: break-word;
+}
+
+/* Light Theme Font Contrast Fixes */
+.light-theme .podium-team-school-line {
+  color: var(--text-secondary, #334155);
+  opacity: 1;
+  font-weight: 600;
+}
+
+.light-theme .podium-team-name-line {
+  color: var(--text-primary, #0f172a);
+}
+
+.light-theme .winners-congrats-title {
+  color: var(--color-gold, #d97706);
+  text-shadow: 0 0 15px rgba(217, 119, 6, 0.25);
+}
+
+.light-theme .winners-event-subtitle {
+  color: var(--text-primary, #0f172a);
+}
+
+.light-theme .winners-round-meta,
+.light-theme .winners-date-text {
+  color: var(--color-cyan, #0284c7);
+}
+
+.podium-pillar {
+  border-radius: 1rem 1rem 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-shadow: inset 0 2px 10px rgba(255, 255, 255, 0.2), 0 15px 30px rgba(0,0,0,0.5);
+}
+
+.gold-pillar {
+  height: 190px;
+  background: linear-gradient(180deg, rgba(234, 179, 8, 0.65) 0%, rgba(161, 98, 7, 0.85) 100%);
+  border: 2px solid #fde047;
+}
+
+.silver-pillar {
+  height: 140px;
+  background: linear-gradient(180deg, rgba(203, 213, 225, 0.55) 0%, rgba(71, 85, 105, 0.75) 100%);
+  border: 2px solid #cbd5e1;
+}
+
+.bronze-pillar {
+  height: 105px;
+  background: linear-gradient(180deg, rgba(217, 119, 6, 0.55) 0%, rgba(120, 53, 15, 0.75) 100%);
+  border: 2px solid #fb923c;
+}
+
+/* Larger Medal Icons (3.2rem - 4.5rem) */
+.pillar-rank-badge {
+  font-size: clamp(3.2rem, 4.5vw, 4.5rem);
+  line-height: 1;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+}
+
+.pillar-rank-title {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: #ffffff;
+  font-family: var(--font-title);
+  text-shadow: 0 2px 4px rgba(0,0,0,0.6);
 }
 </style>

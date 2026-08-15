@@ -436,7 +436,8 @@ add column if not exists answer_image_url text;
 alter table rounds 
 add column if not exists presenter_active_question integer not null default 1,
 add column if not exists presenter_show_state text not null default 'question', -- 'question', 'timer_start', 'answer_revealed', 'correct_teams'
-add column if not exists presenter_timer_started_at timestamp with time zone;
+add column if not exists presenter_timer_started_at timestamp with time zone,
+add column if not exists presenter_theme text not null default 'dark';
 
 -- 3. Add secure RPC function to update presenter state with passkey validation
 create or replace function update_presenter_state_secure(
@@ -465,6 +466,34 @@ begin
         presenter_active_question = p_active_question,
         presenter_show_state = p_show_state,
         presenter_timer_started_at = case when p_timer_started_at is not null then p_timer_started_at::timestamp with time zone else null end
+    where id = p_round_id;
+
+    return true;
+end;
+$$;
+
+-- 3.1 Add secure RPC function to update presenter theme with passkey validation
+create or replace function update_presenter_theme_secure(
+    p_round_id uuid,
+    p_presenter_theme text,
+    p_passkey text
+)
+returns boolean
+security definer
+language plpgsql
+as $$
+declare
+    admin_key text;
+begin
+    -- Verify Admin Passkey
+    select value into admin_key from system_settings where key = 'admin_passkey';
+    if p_passkey <> admin_key then
+        raise exception 'รหัสผ่านแอดมินไม่ถูกต้อง!';
+    end if;
+
+    -- Update round presenter theme
+    update rounds
+    set presenter_theme = p_presenter_theme
     where id = p_round_id;
 
     return true;
@@ -592,6 +621,37 @@ add column if not exists choices_layout text not null default '2_col';
 -- 7. Add round_date column to rounds table
 alter table rounds 
 add column if not exists round_date text;
+
+-- 8. Add winner_data column to rounds table for winner announcement settings
+alter table rounds 
+add column if not exists winner_data jsonb;
+
+-- 9. Add secure RPC function to update winner data
+create or replace function update_winner_data_secure(
+    p_round_id uuid,
+    p_winner_data jsonb,
+    p_passkey text
+)
+returns boolean
+security definer
+language plpgsql
+as $$
+declare
+    admin_key text;
+begin
+    -- Verify Admin Passkey
+    select value into admin_key from system_settings where key = 'admin_passkey';
+    if p_passkey <> admin_key then
+        raise exception 'รหัสผ่านแอดมินไม่ถูกต้อง!';
+    end if;
+
+    update rounds
+    set winner_data = p_winner_data
+    where id = p_round_id;
+
+    return true;
+end;
+$$;
 
 -- Notify schema reload
 notify pgrst, 'reload schema';
