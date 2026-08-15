@@ -23,7 +23,9 @@ import {
   Clock,
   BookOpen,
   Sun,
-  Moon
+  Moon,
+  Sparkles,
+  EyeOff
 } from 'lucide-vue-next'
 import type { Question, Answer, Team } from '~/types'
 
@@ -51,6 +53,7 @@ const isLoaded = ref(false)
 const soundEnabled = ref(true)
 const ttsEnabled = ref(true)
 const presenterTheme = ref<'dark' | 'light'>('dark')
+const balloonsEnabled = ref(true)
 
 const cleanupSubscriptions = () => {
   if (answersChannel && supabase.value) {
@@ -93,7 +96,8 @@ const sendAudioSettings = () => {
   const payload = {
     soundEnabled: soundEnabled.value,
     ttsEnabled: ttsEnabled.value,
-    presenterTheme: presenterTheme.value
+    presenterTheme: presenterTheme.value,
+    balloonsEnabled: balloonsEnabled.value
   }
 
   if (configChannel) {
@@ -111,6 +115,12 @@ const sendAudioSettings = () => {
       setTimeout(() => bc.close(), 200)
     } catch (e) {}
   }
+}
+
+const toggleBalloons = (e?: Event) => {
+  if (e) e.stopPropagation()
+  balloonsEnabled.value = !balloonsEnabled.value
+  sendAudioSettings()
 }
 
 const togglePresenterTheme = async () => {
@@ -358,10 +368,19 @@ const handleExit = () => {
             <div class="setup-buttons-grid">
               <button 
                 @click="updatePresenterState(1, 'welcome')" 
-                class="btn btn-secondary btn-setup" 
+                class="btn btn-secondary btn-setup btn-welcome-with-toggle" 
                 :class="{ active: currentRound.presenter_show_state === 'welcome' }"
               >
-                1. หน้าปก
+                <span class="btn-setup-text">1. หน้าปก</span>
+                <span 
+                  @click.stop="toggleBalloons" 
+                  class="balloon-toggle-mini-badge"
+                  :class="{ 'is-disabled': !balloonsEnabled }"
+                  :title="balloonsEnabled ? 'ลูกโป่งชื่อทีม: เปิดอยู่ (คลิกเพื่อหยุดและซ่อน)' : 'ลูกโป่งชื่อทีม: หยุด/ซ่อนอยู่ (คลิกเพื่อเปิดแสดง)'"
+                >
+                  <Sparkles v-if="balloonsEnabled" :size="11" class="balloon-icon-active" />
+                  <EyeOff v-else :size="11" class="balloon-icon-inactive" />
+                </span>
               </button>
               
               <button 
@@ -397,11 +416,27 @@ const handleExit = () => {
               </button>
 
               <button 
+                @click="updatePresenterState(currentRound.presenter_active_question || 1, 'scoreboard')" 
+                class="btn btn-secondary btn-setup scoreboard-setup-btn" 
+                :class="{ active: currentRound.presenter_show_state === 'scoreboard' }"
+              >
+                📊 6. แสดงคะแนน
+              </button>
+
+              <button 
                 @click="updatePresenterState(currentRound.presenter_active_question || 1, 'winners')" 
                 class="btn btn-primary btn-setup winner-setup-btn" 
                 :class="{ active: currentRound.presenter_show_state === 'winners' }"
               >
-                🏆 6. ประกาศผู้ชนะ 1-3
+                🏆 7. ประกาศผู้ชนะ
+              </button>
+
+              <button 
+                @click="updatePresenterState(currentRound.presenter_active_question || 1, 'thank_you')" 
+                class="btn btn-secondary btn-setup thank-you-setup-btn" 
+                :class="{ active: currentRound.presenter_show_state === 'thank_you' }"
+              >
+                💖 8. ขอบคุณทีมเข้าร่วม
               </button>
             </div>
           </div>
@@ -437,7 +472,7 @@ const handleExit = () => {
                   @click="toggleSound" 
                   class="btn toggle-audio-btn" 
                   :class="soundEnabled ? 'btn-primary' : 'btn-secondary'"
-                  :title="soundEnabled ? 'เสียงเตือนเวลานับถอยหลัง: เปิด' : 'เสียงเตือนเวลานับถอยหลัง: ปิด'"
+                  :title="soundEnabled ? 'เสียงเอฟเฟกต์ / เพลงฉลอง (Presenter): เปิด' : 'เสียงเอฟเฟกต์ / เพลงฉลอง (Presenter): ปิด'"
                 >
                   <Volume2 v-if="soundEnabled" :size="14" />
                   <VolumeX v-else :size="14" />
@@ -680,7 +715,7 @@ const handleExit = () => {
   gap: 0.5rem;
 }
 
-.led-btn, .exit-btn {
+.led-btn, .winner-btn, .exit-btn {
   height: 36px;
   font-size: 0.85rem;
   padding: 0 0.85rem;
@@ -753,7 +788,7 @@ const handleExit = () => {
 
 .setup-buttons-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.4rem;
 }
 
@@ -773,6 +808,66 @@ const handleExit = () => {
   transition: all var(--transition-fast);
 }
 
+.btn-welcome-with-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.2rem 0.2rem 0.35rem;
+}
+
+.btn-setup-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.balloon-toggle-mini-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: rgba(0, 229, 255, 0.25);
+  border: 1px solid rgba(0, 229, 255, 0.5);
+  color: #00e5ff;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.balloon-toggle-mini-badge:hover {
+  transform: scale(1.2);
+  background: rgba(0, 229, 255, 0.45);
+  border-color: #00e5ff;
+}
+
+.balloon-toggle-mini-badge.is-disabled {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #8892b0;
+  opacity: 0.8;
+}
+
+.balloon-toggle-mini-badge.is-disabled:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.btn-setup.active .balloon-toggle-mini-badge {
+  background: rgba(0, 0, 0, 0.25);
+  border-color: rgba(0, 0, 0, 0.4);
+  color: #000000;
+}
+
+.btn-setup.active .balloon-toggle-mini-badge.is-disabled {
+  background: rgba(0, 0, 0, 0.12);
+  border-color: rgba(0, 0, 0, 0.25);
+  color: rgba(0, 0, 0, 0.5);
+}
+
 .btn-setup:hover {
   background: rgba(0, 229, 255, 0.15);
   border-color: var(--color-cyan);
@@ -784,6 +879,63 @@ const handleExit = () => {
   color: #000000 !important;
   border-color: var(--color-cyan) !important;
   box-shadow: var(--shadow-neon-cyan);
+}
+
+.scoreboard-setup-btn {
+  background: rgba(0, 229, 255, 0.12);
+  border-color: rgba(0, 229, 255, 0.35);
+  color: #00e5ff;
+}
+
+.scoreboard-setup-btn:hover {
+  background: rgba(0, 229, 255, 0.25);
+  border-color: #00e5ff;
+  color: #ffffff;
+}
+
+.scoreboard-setup-btn.active {
+  background: linear-gradient(135deg, #00e5ff, #00b4d8) !important;
+  color: #000000 !important;
+  border-color: #00e5ff !important;
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.5);
+}
+
+.winner-setup-btn {
+  background: rgba(255, 215, 0, 0.12);
+  border-color: rgba(255, 215, 0, 0.35);
+  color: #ffd700;
+}
+
+.winner-setup-btn:hover {
+  background: rgba(255, 215, 0, 0.25);
+  border-color: #ffd700;
+  color: #ffffff;
+}
+
+.winner-setup-btn.active {
+  background: linear-gradient(135deg, #ffd700, #ff9100) !important;
+  color: #000000 !important;
+  border-color: #ffd700 !important;
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+}
+
+.thank-you-setup-btn {
+  background: rgba(255, 46, 147, 0.12);
+  border-color: rgba(255, 46, 147, 0.35);
+  color: #ff60a8;
+}
+
+.thank-you-setup-btn:hover {
+  background: rgba(255, 46, 147, 0.25);
+  border-color: #ff2e93;
+  color: #ffffff;
+}
+
+.thank-you-setup-btn.active {
+  background: linear-gradient(135deg, #ff2e93, #a855f7) !important;
+  color: #ffffff !important;
+  border-color: #ff2e93 !important;
+  box-shadow: 0 0 15px rgba(255, 46, 147, 0.5);
 }
 
 /* Light Theme Overrides for Setup Buttons */
@@ -803,6 +955,24 @@ const handleExit = () => {
   color: #000000 !important;
   border-color: var(--color-cyan) !important;
   box-shadow: var(--shadow-neon-cyan);
+}
+
+.light-theme .scoreboard-setup-btn {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(14, 165, 233, 0.35);
+  color: #0284c7;
+}
+
+.light-theme .winner-setup-btn {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #b45309;
+}
+
+.light-theme .thank-you-setup-btn {
+  background: rgba(236, 72, 153, 0.12);
+  border-color: rgba(236, 72, 153, 0.35);
+  color: #be185d;
 }
 
 /* CONTROLLER CARD */
