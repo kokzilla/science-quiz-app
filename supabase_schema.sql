@@ -23,10 +23,14 @@ create table if not exists teams (
     round_id uuid references rounds(id) on delete cascade not null,
     team_number integer not null,
     name text not null,
+    school_name text, -- School/Institution name (optional)
     tie_breaker_score integer not null default 0, -- Manual points to resolve ties
     created_at timestamp with time zone default timezone('utc'::text, now()) not null,
     unique(round_id, team_number)
 );
+
+-- Migration helper if table already exists
+alter table teams add column if not exists school_name text;
 
 -- 3. Questions Table (Answer Key Setup)
 create table if not exists questions (
@@ -129,7 +133,7 @@ create policy "Allow public read answers" on answers for select using (true);
 -- SECURE INTERFACE (SECURITY DEFINER RPCs)
 -- ==========================================
 
--- A. Staff Answer Submission
+-- A. Staff / Admin Answer Submission
 create or replace function submit_answer_secure(
     p_team_id uuid,
     p_question_number integer,
@@ -142,12 +146,15 @@ security definer
 language plpgsql
 as $$
 declare
-    actual_key text;
+    actual_staff_key text;
+    actual_admin_key text;
 begin
-    -- Validate staff passkey
-    select value into actual_key from system_settings where key = 'staff_passkey';
-    if p_staff_passkey != actual_key then
-        raise exception 'สิทธิ์ในการบันทึกข้อมูลไม่ถูกต้อง (Invalid Staff Passkey)';
+    -- Validate staff or admin passkey
+    select value into actual_staff_key from system_settings where key = 'staff_passkey';
+    select value into actual_admin_key from system_settings where key = 'admin_passkey';
+
+    if p_staff_passkey != actual_staff_key and p_staff_passkey != actual_admin_key then
+        raise exception 'สิทธิ์ในการบันทึกข้อมูลไม่ถูกต้อง (Invalid Staff/Admin Passkey)';
     end if;
 
     -- Upsert answer
@@ -162,14 +169,18 @@ end;
 $$;
 
 -- B. Admin Manage Teams
+drop function if exists manage_team_secure(text, uuid, integer, text, integer, uuid, text);
+drop function if exists manage_team_secure(text, uuid, integer, text, integer, uuid, text, text);
+
 create or replace function manage_team_secure(
-    p_action text, -- 'insert', 'delete', 'tie_breaker'
+    p_action text, -- 'insert', 'delete', 'tie_breaker', 'update_name', 'update_team'
     p_round_id uuid,
     p_team_number integer,
     p_name text,
     p_tie_breaker_score integer,
     p_team_id uuid,
-    p_admin_passkey text
+    p_admin_passkey text,
+    p_school_name text default null
 )
 returns void
 security definer
@@ -185,14 +196,31 @@ begin
     end if;
 
     if p_action = 'insert' then
-        insert into teams (round_id, team_number, name)
-        values (p_round_id, p_team_number, p_name);
+        if exists (select 1 from teams where round_id = p_round_id and team_number = p_team_number) then
+            raise exception 'เลขทีม % มีอยู่แล้วในการแข่งขันนี้', p_team_number;
+        end if;
+        insert into teams (round_id, team_number, name, school_name)
+        values (p_round_id, p_team_number, p_name, p_school_name);
     elsif p_action = 'delete' then
         delete from teams where id = p_team_id;
     elsif p_action = 'tie_breaker' then
         update teams set tie_breaker_score = p_tie_breaker_score where id = p_team_id;
     elsif p_action = 'update_name' then
-        update teams set name = p_name where id = p_team_id;
+        update teams set name = p_name, school_name = p_school_name where id = p_team_id;
+    elsif p_action = 'update_team' then
+        if exists (
+            select 1 from teams 
+            where round_id = p_round_id 
+              and team_number = p_team_number 
+              and id != p_team_id
+        ) then
+            raise exception 'เลขทีม % มีอยู่แล้วในการแข่งขันนี้', p_team_number;
+        end if;
+        update teams 
+        set team_number = p_team_number, 
+            name = p_name, 
+            school_name = p_school_name 
+        where id = p_team_id;
     end if;
 end;
 $$;

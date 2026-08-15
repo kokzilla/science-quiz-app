@@ -111,6 +111,14 @@ onMounted(async () => {
   staffPasskey.value = getActivePasskey()
   passkeyValid.value = true
 
+  const qParam = (route.query.question || route.query.q) as string
+  if (qParam) {
+    const parsedQ = parseInt(qParam)
+    if (!isNaN(parsedQ) && parsedQ >= 1 && parsedQ <= TOTAL_QUESTIONS) {
+      selectedQuestion.value = parsedQ
+    }
+  }
+
   if (isConfigured.value) {
     // Load local storage preferences
     if (typeof window !== 'undefined') {
@@ -214,7 +222,7 @@ const submitAnswer = async (teamId: string, choice: string) => {
       p_team_id: teamId,
       p_question_number: selectedQuestion.value,
       p_submitted_answer: finalChoice,
-      p_recorded_by: staffName.value || 'Staff',
+      p_recorded_by: staffName.value || (localStorage.getItem('admin_passkey') ? 'Admin' : 'Staff'),
       p_staff_passkey: staffPasskey.value
     })
 
@@ -287,7 +295,7 @@ const isQuestionCompleted = (qNum: number) => {
             v-model="staffName" 
             type="text" 
             class="form-input" 
-            placeholder="ชื่อผู้บันทึก (เช่น Staff A)" 
+            placeholder="ชื่อผู้บันทึก (เช่น Admin / Staff A)" 
           />
         </div>
         

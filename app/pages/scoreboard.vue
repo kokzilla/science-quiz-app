@@ -463,6 +463,7 @@ const leaderboard = computed(() => {
             <!-- Team Name -->
             <div class="team-name">
               <span class="team-name-text" :title="item.name">{{ item.name }}</span>
+              <span v-if="item.school_name" class="team-school-text">({{ item.school_name }})</span>
               <span v-if="item.tie_breaker_score > 0" class="status-pill-tiebreak">
                 ไทเบรก +{{ item.tie_breaker_score }}
               </span>
@@ -666,5 +667,12 @@ const leaderboard = computed(() => {
   border-radius: 6px;
   box-shadow: 0 0 10px rgba(0, 229, 255, 0.15);
   margin: 0 0.25rem;
+}
+
+.team-school-text {
+  font-size: 0.85rem;
+  opacity: 0.75;
+  margin-left: 0.35rem;
+  font-weight: normal;
 }
 </style>

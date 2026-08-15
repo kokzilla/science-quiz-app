@@ -20,7 +20,8 @@ import {
   Upload,
   Database,
   Sliders,
-  Presentation
+  Presentation,
+  Pencil
 } from 'lucide-vue-next'
 import type { Team, Question, ProgressSummary } from '~/types'
 
@@ -37,9 +38,19 @@ const activeTab = ref<'teams' | 'questions' | 'reveal' | 'progress' | 'bank'>('t
 // Teams State
 const teams = ref<Team[]>([])
 const newTeamName = ref('')
+const newTeamSchoolName = ref('')
 const newTeamNumber = ref<number | ''>('')
 const bulkTeamInput = ref('')
 const isAddingTeam = ref(false)
+
+// Edit Team Modal State
+const showEditTeamModal = ref(false)
+const editingTeam = ref<Team | null>(null)
+const editTeamNumber = ref<number | ''>('')
+const editTeamName = ref('')
+const editTeamSchoolName = ref('')
+const editTeamError = ref('')
+const isSavingEditTeam = ref(false)
 
 // Questions / Answer Keys State
 const questions = ref<Question[]>([])
@@ -109,28 +120,41 @@ const fetchTeams = async () => {
 }
 
 const handleAddTeam = async () => {
-  if (!supabase.value || !selectedRoundId.value || !newTeamName.value || newTeamNumber.value === '') return
+  if (!supabase.value || !selectedRoundId.value || !newTeamName.value.trim() || newTeamNumber.value === '') return
   if (!adminPasskey.value) {
     alert('กรุณากรอกรหัสผ่านแอดมินก่อนดำเนินการ')
     return
   }
+
+  const targetNum = Number(newTeamNumber.value)
+  if (teams.value.some(t => t.team_number === targetNum)) {
+    alert(`เลขทีม ${targetNum} ถูกใช้งานแล้วในการแข่งขันนี้ กรุณาใช้เลขทีมอื่น`)
+    return
+  }
+
   isAddingTeam.value = true
   const { error } = await supabase.value.rpc('manage_team_secure', {
     p_action: 'insert',
     p_round_id: selectedRoundId.value,
-    p_team_number: newTeamNumber.value,
-    p_name: newTeamName.value,
+    p_team_number: targetNum,
+    p_name: newTeamName.value.trim(),
     p_tie_breaker_score: 0,
     p_team_id: '00000000-0000-0000-0000-000000000000', // dummy
-    p_admin_passkey: adminPasskey.value
+    p_admin_passkey: adminPasskey.value,
+    p_school_name: newTeamSchoolName.value.trim() || null
   })
   isAddingTeam.value = false
   if (!error) {
     newTeamName.value = ''
+    newTeamSchoolName.value = ''
     fetchTeams()
     fetchProgress()
   } else {
-    alert(`ข้อผิดพลาด: ${error.message}`)
+    if (error.message?.includes('Could not find the function')) {
+      alert('เกิดข้อผิดพลาด: ฐานข้อมูล Supabase ยังไม่ได้อัปเดตฟังก์ชันใหม่\n\nกรุณานำคอลัมน์และฟังก์ชันจาก supabase_schema.sql ไปรันใน Supabase SQL Editor ก่อนครับ')
+    } else {
+      alert(`ข้อผิดพลาด: ${error.message}`)
+    }
   }
 }
 
@@ -146,17 +170,26 @@ const handleBulkImportTeams = async () => {
   const insertData = lines.map((line, index) => {
     let num = startNum + index
     let name = line
+    let school: string | null = null
     
     // Try to split on tab or comma
-    const match = line.match(/^(\d+)[\s,\t]+(.+)$/)
-    if (match) {
-      num = parseInt(match[1])
-      name = match[2].trim()
+    const parts = line.split(/[\t,]+/).map(p => p.trim())
+    if (parts.length >= 2 && !isNaN(parseInt(parts[0]))) {
+      num = parseInt(parts[0])
+      name = parts[1]
+      if (parts[2]) school = parts[2]
+    } else {
+      const match = line.match(/^(\d+)[\s,\t]+(.+)$/)
+      if (match) {
+        num = parseInt(match[1])
+        name = match[2].trim()
+      }
     }
     
     return {
       team_number: num,
-      name: name
+      name: name,
+      school_name: school
     }
   })
   
@@ -171,7 +204,8 @@ const handleBulkImportTeams = async () => {
       p_name: team.name,
       p_tie_breaker_score: 0,
       p_team_id: '00000000-0000-0000-0000-000000000000', // dummy
-      p_admin_passkey: adminPasskey.value
+      p_admin_passkey: adminPasskey.value,
+      p_school_name: team.school_name
     })
     if (error) {
       lastError = error.message
@@ -186,7 +220,78 @@ const handleBulkImportTeams = async () => {
     fetchProgress()
     alert(`นำเข้าทีมเข้าแข่งสำเร็จ ${successCount} ทีม!${lastError ? ` (ล้มเหลวบางส่วน: ${lastError})` : ''}`)
   } else if (lastError) {
-    alert(`ข้อผิดพลาดการนำเข้า: ${lastError}`)
+    if (lastError.includes('Could not find the function')) {
+      alert('เกิดข้อผิดพลาด: ฐานข้อมูล Supabase ยังไม่ได้อัปเดตฟังก์ชันใหม่\n\nกรุณานำคอลัมน์และฟังก์ชันจาก supabase_schema.sql ไปรันใน Supabase SQL Editor ก่อนครับ')
+    } else {
+      alert(`ข้อผิดพลาดการนำเข้า: ${lastError}`)
+    }
+  }
+}
+
+const openEditTeamModal = (team: Team) => {
+  editingTeam.value = team
+  editTeamNumber.value = team.team_number
+  editTeamName.value = team.name
+  editTeamSchoolName.value = team.school_name || ''
+  editTeamError.value = ''
+  showEditTeamModal.value = true
+}
+
+const handleSaveEditTeam = async () => {
+  if (!editingTeam.value || editTeamNumber.value === '' || !editTeamName.value.trim()) {
+    editTeamError.value = 'กรุณากรอกเลขทีมและชื่อทีมให้ครบถ้วน'
+    return
+  }
+
+  const targetNum = Number(editTeamNumber.value)
+  const trimmedName = editTeamName.value.trim()
+  const trimmedSchool = editTeamSchoolName.value.trim() || null
+
+  // Check duplicate team number in current round (excluding current team)
+  const isDuplicate = teams.value.some(
+    t => t.id !== editingTeam.value!.id && t.team_number === targetNum
+  )
+
+  if (isDuplicate) {
+    editTeamError.value = `เลขทีม ${targetNum} ถูกใช้งานแล้วในการแข่งขันนี้ กรุณาใช้เลขทีมอื่น`
+    return
+  }
+
+  if (!supabase.value || !selectedRoundId.value) return
+  if (!adminPasskey.value) {
+    alert('กรุณากรอกรหัสผ่านแอดมินก่อนดำเนินการ')
+    return
+  }
+
+  isSavingEditTeam.value = true
+  editTeamError.value = ''
+
+  try {
+    const { error } = await supabase.value.rpc('manage_team_secure', {
+      p_action: 'update_team',
+      p_round_id: selectedRoundId.value,
+      p_team_number: targetNum,
+      p_name: trimmedName,
+      p_tie_breaker_score: 0,
+      p_team_id: editingTeam.value.id,
+      p_admin_passkey: adminPasskey.value,
+      p_school_name: trimmedSchool
+    })
+
+    if (error) {
+      if (error.message?.includes('Could not find the function')) {
+        editTeamError.value = 'ฐานข้อมูล Supabase ยังไม่ได้อัปเดตฟังก์ชันใหม่ กรุณารันคำสั่ง SQL ใน Supabase SQL Editor ก่อนครับ'
+      } else {
+        editTeamError.value = `เกิดข้อผิดพลาด: ${error.message}`
+      }
+    } else {
+      showEditTeamModal.value = false
+      await fetchTeams()
+    }
+  } catch (err: any) {
+    editTeamError.value = `เกิดข้อผิดพลาด: ${err.message}`
+  } finally {
+    isSavingEditTeam.value = false
   }
 }
 
@@ -212,38 +317,6 @@ const handleDeleteTeam = async (id: string) => {
     } else {
       alert(`ลบไม่สำเร็จ: ${error.message}`)
     }
-  }
-}
-
-const handleEditTeamName = async (teamId: string, currentName: string) => {
-  const newName = prompt('แก้ไขชื่อโรงเรียน / ชื่อทีม:', currentName)
-  if (newName === null) return
-  const trimmed = newName.trim()
-  if (!trimmed) {
-    alert('ชื่อทีมต้องไม่เป็นค่าว่าง')
-    return
-  }
-
-  if (!supabase.value) return
-  if (!adminPasskey.value) {
-    alert('กรุณากรอกรหัสผ่านแอดมินก่อนดำเนินการ')
-    return
-  }
-
-  const { error } = await supabase.value.rpc('manage_team_secure', {
-    p_action: 'update_name',
-    p_round_id: selectedRoundId.value,
-    p_team_number: 0,
-    p_name: trimmed,
-    p_tie_breaker_score: 0,
-    p_team_id: teamId,
-    p_admin_passkey: adminPasskey.value
-  })
-
-  if (!error) {
-    fetchTeams()
-  } else {
-    alert(`แก้ไขชื่อทีมล้มเหลว: ${error.message}`)
   }
 }
 
@@ -1016,13 +1089,20 @@ const handleCSVImport = async (event: Event) => {
                   v-model="newTeamNumber" 
                   type="number" 
                   class="form-input team-num-input" 
-                  placeholder="เลขที่ทีม" 
+                  placeholder="เลขที่ทีม *" 
                 />
                 <input 
                   v-model="newTeamName" 
                   type="text" 
                   class="form-input team-name-input" 
-                  placeholder="ชื่อทีม / ชื่อโรงเรียน" 
+                  placeholder="ชื่อทีม / ชื่อกลุ่ม *" 
+                  @keyup.enter="handleAddTeam"
+                />
+                <input 
+                  v-model="newTeamSchoolName" 
+                  type="text" 
+                  class="form-input team-school-input" 
+                  placeholder="ชื่อโรงเรียน (ไม่บังคับ)" 
                   @keyup.enter="handleAddTeam"
                 />
               </div>
@@ -1038,13 +1118,13 @@ const handleCSVImport = async (event: Event) => {
                 <span>นำเข้าข้อมูลแบบกลุ่ม (Bulk Import)</span>
               </h3>
               <p class="bulk-desc">
-                กรอกรายชื่อทีม 1 บรรทัดต่อ 1 ทีม (สามารถระบุเลขทีมนำหน้าได้ เช่น "01, โรงเรียนวัดราษฎร์ A" หรือเพียงแค่ "โรงเรียนวัดราษฎร์ A")
+                กรอกรายชื่อทีม 1 บรรทัดต่อ 1 ทีม (ระบุแบบ "01, ชื่อทีม, ชื่อโรงเรียน" หรือ "01, ชื่อทีม" หรือเพียงแค่ "ชื่อทีม")
               </p>
               <textarea 
                 v-model="bulkTeamInput" 
                 rows="6" 
                 class="form-input bulk-textarea" 
-                placeholder="โรงเรียนวัดราษฎร์ ทีม A&#10;โรงเรียนวัดราษฎร์ ทีม B&#10;โรงเรียนวิทยาศาสตร์"
+                placeholder="1, ทีมสปุตนิก, โรงเรียนวิทยาศาสตร์&#10;2, ทีมซูเปอร์โนวา, โรงเรียนวัดราษฎร์&#10;ทีมอุกกาบาต"
               ></textarea>
               <button @click="handleBulkImportTeams" class="btn btn-secondary w-full">
                 นำเข้าข้อมูลรายชื่อทีม
@@ -1065,9 +1145,9 @@ const handleCSVImport = async (event: Event) => {
                 <thead>
                   <tr>
                     <th class="team-num-col">เลขทีม</th>
-                    <th>ชื่อโรงเรียน/ทีม</th>
+                    <th>ชื่อทีม / โรงเรียน</th>
                     <th class="tie-breaker-col">คะแนนไทเบรกเกอร์ (เสมอกัน)</th>
-                    <th class="delete-col">ลบ</th>
+                    <th class="actions-col">จัดการ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1075,8 +1155,11 @@ const handleCSVImport = async (event: Event) => {
                     <td class="team-num-cell">
                       {{ String(team.team_number).padStart(2, '0') }}
                     </td>
-                    <td class="team-name-cell" @click="handleEditTeamName(team.id, team.name)">
-                      <span>{{ team.name }}</span>
+                    <td class="team-name-cell" @click="openEditTeamModal(team)">
+                      <div class="team-name-wrapper">
+                        <span class="team-name-primary">{{ team.name }}</span>
+                        <span v-if="team.school_name" class="team-school-secondary">({{ team.school_name }})</span>
+                      </div>
                       <span class="edit-hint">(แก้ไข)</span>
                     </td>
                     <td>
@@ -1092,10 +1175,16 @@ const handleCSVImport = async (event: Event) => {
                         </button>
                       </div>
                     </td>
-                    <td class="delete-cell">
-                      <button @click="handleDeleteTeam(team.id)" class="btn btn-danger delete-btn">
-                        <Trash2 :size="14" />
-                      </button>
+                    <td class="actions-cell">
+                      <div class="team-actions-btns">
+                        <button @click="openEditTeamModal(team)" class="btn btn-secondary edit-btn" title="แก้ไขข้อมูลทีม">
+                          <Pencil :size="14" />
+                          <span>แก้ไข</span>
+                        </button>
+                        <button @click="handleDeleteTeam(team.id)" class="btn btn-danger delete-btn" title="ลบทีม">
+                          <Trash2 :size="14" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 </tbody>
@@ -1519,7 +1608,83 @@ const handleCSVImport = async (event: Event) => {
               </span>
             </div>
           </div>
+
+          <div style="margin-top: 1.25rem; text-align: center;">
+            <NuxtLink 
+              :to="`/staff?round=${selectedRoundId}&question=${modalQuestionNumber}`" 
+              class="btn btn-primary"
+              style="display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none;"
+            >
+              <Pencil :size="16" />
+              ไปที่หน้าบันทึกคะแนนข้อที่ {{ modalQuestionNumber }}
+            </NuxtLink>
+          </div>
         </div>
+      </div>
+    </div>
+
+    <!-- Edit Team Modal -->
+    <div v-if="showEditTeamModal" class="modal-backdrop no-print" @click.self="showEditTeamModal = false">
+      <div class="glass-card modal-edit-team-content">
+        <button @click="showEditTeamModal = false" class="close-edit-modal-btn">
+          ✕
+        </button>
+
+        <h2 class="modal-edit-team-title">
+          <Pencil :size="20" />
+          <span>แก้ไขข้อมูลทีม</span>
+        </h2>
+        <p class="modal-edit-team-subtitle">
+          แก้ไขเลขทีม ชื่อทีม และชื่อโรงเรียนสำหรับรอบการแข่งขันนี้
+        </p>
+
+        <form @submit.prevent="handleSaveEditTeam" class="edit-team-form">
+          <div class="form-group">
+            <label class="form-label">เลขทีม (Team Number) <span class="required-star">*</span></label>
+            <input 
+              v-model.number="editTeamNumber" 
+              type="number" 
+              min="1" 
+              class="form-input" 
+              placeholder="เลขที่ทีม เช่น 1" 
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">ชื่อทีม (Team Name) <span class="required-star">*</span></label>
+            <input 
+              v-model="editTeamName" 
+              type="text" 
+              class="form-input" 
+              placeholder="ชื่อทีม หรือ ชื่อกลุ่มเข้าแข่ง" 
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">ชื่อโรงเรียน / สถาบัน (School Name) <span class="optional-text">(ไม่บังคับ)</span></label>
+            <input 
+              v-model="editTeamSchoolName" 
+              type="text" 
+              class="form-input" 
+              placeholder="เช่น โรงเรียนวิทยาศาสตร์..." 
+            />
+          </div>
+
+          <div v-if="editTeamError" class="edit-team-error-banner">
+            {{ editTeamError }}
+          </div>
+
+          <div class="edit-team-modal-actions">
+            <button type="button" @click="showEditTeamModal = false" class="btn btn-secondary">
+              ยกเลิก
+            </button>
+            <button type="submit" :disabled="isSavingEditTeam" class="btn btn-primary">
+              {{ isSavingEditTeam ? 'กำลังบันทึก...' : 'บันทึกการแก้ไข' }}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 
@@ -2377,5 +2542,129 @@ const handleCSVImport = async (event: Event) => {
   color: var(--color-error); 
   font-size: 0.7rem; 
   padding: 0.2rem 0.5rem;
+}
+
+.add-team-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.team-name-wrapper {
+  display: flex;
+  flex-direction: column;
+}
+
+.team-name-primary {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.team-school-secondary {
+  font-size: 0.85rem;
+  color: #94a3b8;
+}
+
+.actions-col {
+  width: 140px;
+  text-align: center;
+}
+
+.actions-cell {
+  text-align: center;
+}
+
+.team-actions-btns {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+}
+
+/* Edit Team Modal */
+.modal-edit-team-content {
+  position: relative;
+  width: 90%;
+  max-width: 500px;
+  padding: 2rem;
+  background: var(--glass-bg, rgba(15, 23, 42, 0.92));
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.15));
+  border-radius: 1rem;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.close-edit-modal-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #94a3b8);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  transition: all 0.2s;
+}
+
+.close-edit-modal-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.modal-edit-team-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.5rem;
+  color: var(--text-primary, #ffffff);
+  margin-bottom: 0.25rem;
+}
+
+.modal-edit-team-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary, #94a3b8);
+  margin-bottom: 1.5rem;
+}
+
+.edit-team-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.required-star {
+  color: #f87171;
+}
+
+.optional-text {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  font-weight: normal;
+}
+
+.edit-team-error-banner {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.edit-team-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
 }
 </style>

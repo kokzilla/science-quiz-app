@@ -16,6 +16,7 @@ export interface Team {
   round_id: string
   team_number: number
   name: string
+  school_name?: string | null
   tie_breaker_score: number
   created_at?: string
 }

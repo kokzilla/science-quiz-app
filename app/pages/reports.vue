@@ -86,6 +86,8 @@ onMounted(async () => {
 // REPORT CALCULATIONS
 // ==========================================
 
+const rankingsSortBy = ref<'rank' | 'team'>('rank')
+
 // 1. Leaderboard / Rankings calculation (Sums all TOTAL_QUESTIONS questions)
 const rankings = computed(() => {
   if (teams.value.length === 0) return []
@@ -112,7 +114,7 @@ const rankings = computed(() => {
     }
   })
 
-  // Sort: finalScore DESC, tie_breaker_score DESC, team_number ASC
+  // Sort: finalScore DESC, tie_breaker_score DESC, team_number ASC to determine ranks
   list.sort((a, b) => {
     if (b.finalScore !== a.finalScore) return b.finalScore - a.finalScore
     if (b.tie_breaker_score !== a.tie_breaker_score) return b.tie_breaker_score - a.tie_breaker_score
@@ -121,7 +123,7 @@ const rankings = computed(() => {
 
   // Assign ranks
   let currentRank = 1
-  return list.map((item, idx) => {
+  const rankedList = list.map((item, idx) => {
     if (idx > 0 && item.finalScore < list[idx - 1].finalScore) {
       currentRank = idx + 1
     }
@@ -130,11 +132,19 @@ const rankings = computed(() => {
       rank: currentRank
     }
   })
+
+  if (rankingsSortBy.value === 'team') {
+    return rankedList.sort((a, b) => a.team_number - b.team_number)
+  }
+
+  return rankedList
 })
+
+const crosstabSortBy = ref<'score' | 'team'>('score')
 
 // 2. Cross Table (Teams x Questions 1-TOTAL_QUESTIONS grid)
 const crossTable = computed(() => {
-  return teams.value.map(team => {
+  const list = teams.value.map(team => {
     const qDetails = Array.from({ length: TOTAL_QUESTIONS }, (_, idx) => {
       const qNum = idx + 1
       const ansRow = answers.value.find(a => a.team_id === team.id && a.question_number === qNum)
@@ -153,7 +163,16 @@ const crossTable = computed(() => {
       finalScore,
       questions: qDetails
     }
-  }).sort((a, b) => b.finalScore - a.finalScore)
+  })
+
+  if (crosstabSortBy.value === 'team') {
+    return list.sort((a, b) => a.team_number - b.team_number)
+  } else {
+    return list.sort((a, b) => {
+      if (b.finalScore !== a.finalScore) return b.finalScore - a.finalScore
+      return a.team_number - b.team_number
+    })
+  }
 })
 
 // 3. Item Analysis (Difficulty/Correctness statistics per question)
@@ -198,9 +217,9 @@ const handleExportCSV = () => {
   let csvContent = 'data:text/csv;charset=utf-8,\uFEFF' // UTF-8 BOM
   
   if (activeReportTab.value === 'rankings') {
-    csvContent += 'Rank,Team Number,Team Name,Correct Answers,Tie-Breaker Points,Total Score\n'
+    csvContent += 'Rank,Team Number,Team Name,Correct Answers,Wrong Answers,Unanswered,Total Score\n'
     rankings.value.forEach(row => {
-      csvContent += `${row.rank},${row.team_number},"${row.name.replace(/"/g, '""')}",${row.correctCount},${row.tie_breaker_score},${row.finalScore}\n`
+      csvContent += `${row.rank},${row.team_number},"${row.name.replace(/"/g, '""')}",${row.correctCount},${row.wrongCount},${row.unansweredCount},${row.finalScore}\n`
     })
   } else if (activeReportTab.value === 'item-analysis') {
     csvContent += 'Question Number,Correct Choice,Correct Answers,Wrong Answers,Unanswered Count,Correctness Percentage\n'
@@ -316,19 +335,52 @@ const handleExportCSV = () => {
         
         <!-- Tab 1: Leaderboard and Rankings -->
         <div v-if="activeReportTab === 'rankings'">
-          <h2 class="section-title no-print">ทำเนียบอันดับคะแนนรวม (ข้อ 1-{{ TOTAL_QUESTIONS }})</h2>
+          <div class="crosstab-header-row">
+            <h2 class="section-title no-print">ทำเนียบอันดับคะแนนรวม (ข้อ 1-{{ TOTAL_QUESTIONS }})</h2>
+
+            <div class="sort-control-group no-print">
+              <span class="sort-label">เรียงลำดับตาม:</span>
+              <button 
+                @click="rankingsSortBy = 'rank'" 
+                class="btn sort-pill-btn" 
+                :class="{ active: rankingsSortBy === 'rank' }"
+              >
+                เรียงตามอันดับ
+              </button>
+              <button 
+                @click="rankingsSortBy = 'team'" 
+                class="btn sort-pill-btn" 
+                :class="{ active: rankingsSortBy === 'team' }"
+              >
+                เรียงตามเลขทีม
+              </button>
+            </div>
+          </div>
           
           <div class="table-responsive">
             <table class="report-table">
               <thead>
                 <tr>
-                  <th class="rank-col">อันดับ</th>
-                  <th class="team-col">เลขประจำทีม</th>
+                  <th 
+                    class="rank-col crosstab-header-sortable center-text"
+                    :class="{ 'active-sort': rankingsSortBy === 'rank' }"
+                    @click="rankingsSortBy = 'rank'"
+                    title="คลิกเพื่อเรียงตามอันดับ"
+                  >
+                    อันดับ {{ rankingsSortBy === 'rank' ? '▲' : '' }}
+                  </th>
+                  <th 
+                    class="team-col crosstab-header-sortable"
+                    :class="{ 'active-sort': rankingsSortBy === 'team' }"
+                    @click="rankingsSortBy = 'team'"
+                    title="คลิกเพื่อเรียงตามเลขทีม"
+                  >
+                    เลขประจำทีม {{ rankingsSortBy === 'team' ? '▲' : '' }}
+                  </th>
                   <th>ชื่อทีม / สังกัดโรงเรียน</th>
                   <th class="center-text">ตอบถูก (ข้อ)</th>
                   <th class="center-text">ตอบผิด (ข้อ)</th>
                   <th class="center-text">ไม่ตอบ (ข้อ)</th>
-                  <th class="center-text tiebreak-score-col">คะแนนไทเบรกเกอร์</th>
                   <th class="right-text total-score-col">คะแนนรวมสุทธิ</th>
                 </tr>
               </thead>
@@ -338,27 +390,28 @@ const handleExportCSV = () => {
                   :key="row.id"
                   :class="{ 'rank-highlight': row.rank <= 3 }"
                 >
-                  <td>
+                  <td class="center-text">
                     <span 
-                      v-if="row.rank <= 3" 
-                      class="status-pill rank-pill"
-                      :class="row.rank === 1 ? 'active' : row.rank === 2 ? 'completed' : 'pending'"
-                      :style="row.rank === 1 ? 'background: rgba(255, 214, 0, 0.2); color: var(--color-gold);' : ''"
+                      class="rank-circle" 
+                      :class="{
+                        'rank-1-circle': row.rank === 1,
+                        'rank-2-circle': row.rank === 2,
+                        'rank-3-circle': row.rank === 3
+                      }"
                     >
-                      อันดับ {{ row.rank }}
-                    </span>
-                    <span v-else class="regular-rank">
                       {{ row.rank }}
                     </span>
                   </td>
                   <td class="team-number-highlight">
-                    {{ String(team_number).padStart(2, '0') || String(row.team_number).padStart(2, '0') }}
+                    {{ String(row.team_number).padStart(2, '0') }}
                   </td>
-                  <td class="team-name-bold">{{ row.name }}</td>
+                  <td class="team-name-bold">
+                    {{ row.name }}
+                    <span v-if="row.school_name" class="team-school-text">({{ row.school_name }})</span>
+                  </td>
                   <td class="center-text text-success font-bold">{{ row.correctCount }}</td>
                   <td class="center-text text-error">{{ row.wrongCount }}</td>
                   <td class="center-text text-muted">{{ row.unansweredCount }}</td>
-                  <td class="center-text text-gold font-bold">{{ row.tie_breaker_score }}</td>
                   <td class="right-text final-score-cell">
                     {{ row.finalScore }}
                   </td>
@@ -370,16 +423,45 @@ const handleExportCSV = () => {
 
         <!-- Tab 2: Detailed Cross-Grid Table -->
         <div v-if="activeReportTab === 'crosstab'">
-          <h2 class="section-title no-print">ตารางวิเคราะห์คำตอบรายข้อแบบละเอียด</h2>
-          <p class="section-desc no-print">
-            สัญลักษณ์: <span class="text-success">✓ (ตอบถูก)</span>, <span class="text-error">X (ตอบผิด)</span>, <span class="text-muted">- (ไม่บันทึกคำตอบ)</span>
-          </p>
+          <div class="crosstab-header-row">
+            <div>
+              <h2 class="section-title no-print">ตารางวิเคราะห์คำตอบรายข้อแบบละเอียด</h2>
+              <p class="section-desc no-print">
+                สัญลักษณ์: <span class="text-success">✓ (ตอบถูก)</span>, <span class="text-error">X (ตอบผิด)</span>, <span class="text-muted">- (ไม่บันทึกคำตอบ)</span>
+              </p>
+            </div>
+
+            <div class="sort-control-group no-print">
+              <span class="sort-label">เรียงลำดับตาม:</span>
+              <button 
+                @click="crosstabSortBy = 'score'" 
+                class="btn sort-pill-btn" 
+                :class="{ active: crosstabSortBy === 'score' }"
+              >
+                เรียงตามคะแนน
+              </button>
+              <button 
+                @click="crosstabSortBy = 'team'" 
+                class="btn sort-pill-btn" 
+                :class="{ active: crosstabSortBy === 'team' }"
+              >
+                เรียงตามเลขทีม
+              </button>
+            </div>
+          </div>
 
           <div class="table-responsive">
             <table class="report-table crosstab-table">
               <thead>
                 <tr>
-                  <th class="crosstab-team-col">เลขทีม</th>
+                  <th 
+                    class="crosstab-team-col crosstab-header-sortable" 
+                    :class="{ 'active-sort': crosstabSortBy === 'team' }"
+                    @click="crosstabSortBy = 'team'"
+                    title="คลิกเพื่อเรียงตามเลขทีม"
+                  >
+                    เลขทีม {{ crosstabSortBy === 'team' ? '▲' : '' }}
+                  </th>
                   <th class="crosstab-name-col">ชื่อทีม</th>
                   <th 
                     v-for="i in TOTAL_QUESTIONS" 
@@ -388,7 +470,14 @@ const handleExportCSV = () => {
                   >
                     Q{{ i }}
                   </th>
-                  <th class="right-text crosstab-score-col">คะแนน</th>
+                  <th 
+                    class="right-text crosstab-score-col crosstab-header-sortable" 
+                    :class="{ 'active-sort': crosstabSortBy === 'score' }"
+                    @click="crosstabSortBy = 'score'"
+                    title="คลิกเพื่อเรียงตามคะแนน"
+                  >
+                    คะแนน {{ crosstabSortBy === 'score' ? '▼' : '' }}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -541,7 +630,7 @@ const handleExportCSV = () => {
 .report-title {
   font-size: 2.2rem; 
   margin-bottom: 0.25rem; 
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .report-subtitle {
@@ -580,6 +669,10 @@ const handleExportCSV = () => {
   background: rgba(255,255,255,0.015);
 }
 
+:global(.light-theme) .report-data-card {
+  background: var(--glass-bg);
+}
+
 .section-title {
   font-size: 1.3rem; 
   margin-bottom: 1rem; 
@@ -603,6 +696,10 @@ const handleExportCSV = () => {
   background: rgba(255, 255, 255, 0.02);
 }
 
+:global(.light-theme) .rank-highlight {
+  background: rgba(0, 0, 0, 0.03);
+}
+
 .rank-pill {
   font-family: var(--font-title); 
   font-weight: 800;
@@ -624,11 +721,79 @@ const handleExportCSV = () => {
   font-weight: 600;
 }
 
+.team-school-text {
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin-left: 0.35rem;
+}
+
+.rank-circle {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: 0.95rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  margin: 0 auto;
+}
+
+.rank-1-circle {
+  background: rgba(255, 214, 0, 0.18);
+  border: 2px solid var(--color-gold);
+  color: var(--color-gold);
+  box-shadow: 0 0 10px rgba(255, 214, 0, 0.25);
+  font-weight: 800;
+}
+
+.rank-2-circle {
+  background: rgba(224, 224, 224, 0.18);
+  border: 2px solid var(--color-silver);
+  color: var(--color-silver);
+  font-weight: 800;
+}
+
+.rank-3-circle {
+  background: rgba(205, 127, 50, 0.18);
+  border: 2px solid var(--color-bronze);
+  color: var(--color-bronze);
+  font-weight: 800;
+}
+
+:global(.light-theme) .rank-circle {
+  background: #e2e8f0;
+  border-color: rgba(15, 23, 42, 0.15);
+  color: #334155;
+}
+
+:global(.light-theme) .rank-1-circle {
+  background: rgba(245, 127, 23, 0.15);
+  border-color: #f57f17;
+  color: #d97706;
+}
+
+:global(.light-theme) .rank-2-circle {
+  background: rgba(148, 163, 184, 0.2);
+  border-color: #64748b;
+  color: #475569;
+}
+
+:global(.light-theme) .rank-3-circle {
+  background: rgba(205, 127, 50, 0.15);
+  border-color: #cd7f32;
+  color: #b45309;
+}
+
 .final-score-cell {
   font-family: var(--font-title); 
   font-weight: 800; 
   font-size: 1.25rem; 
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .crosstab-team-col { width: 50px; }
@@ -662,7 +827,7 @@ const handleExportCSV = () => {
   font-family: var(--font-title); 
   font-weight: 800; 
   font-size: 1.1rem; 
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .q-num-col { width: 100px; }
@@ -679,7 +844,7 @@ const handleExportCSV = () => {
   font-family: var(--font-title); 
   font-weight: 800; 
   font-size: 1.15rem; 
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .high-correct {
@@ -688,5 +853,82 @@ const handleExportCSV = () => {
 
 .low-correct {
   color: var(--color-error) !important;
+}
+
+/* Crosstab Sort Controls */
+.crosstab-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.sort-control-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(10, 12, 22, 0.6);
+  border: 1px solid var(--glass-border);
+  padding: 0.35rem 0.65rem;
+  border-radius: var(--radius-sm);
+}
+
+.sort-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.sort-pill-btn {
+  padding: 0.3rem 0.75rem;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.sort-pill-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sort-pill-btn.active {
+  background: var(--color-cyan);
+  color: #000;
+  font-weight: 700;
+}
+
+:global(.light-theme) .sort-control-group {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.15);
+}
+
+:global(.light-theme) .sort-pill-btn {
+  color: var(--text-secondary);
+}
+
+:global(.light-theme) .sort-pill-btn.active {
+  background: var(--color-cyan);
+  color: #ffffff;
+}
+
+.crosstab-header-sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--transition-fast);
+}
+
+.crosstab-header-sortable:hover {
+  color: var(--color-cyan);
+}
+
+.crosstab-header-sortable.active-sort {
+  color: var(--color-cyan);
+  font-weight: 800;
 }
 </style>

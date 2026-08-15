@@ -688,16 +688,47 @@ const handleExit = () => {
   font-size: 0.78rem;
   font-weight: 600;
   text-align: center;
-  height: 32px;
+  height: 34px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.btn-setup:hover {
+  background: rgba(0, 229, 255, 0.15);
+  border-color: var(--color-cyan);
+  color: #ffffff;
 }
 
 .btn-setup.active {
   background: var(--color-cyan) !important;
-  color: #000 !important;
+  color: #000000 !important;
   border-color: var(--color-cyan) !important;
+  box-shadow: var(--shadow-neon-cyan);
+}
+
+/* Light Theme Overrides for Setup Buttons */
+.light-theme .btn-setup {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  color: var(--text-primary);
+}
+
+.light-theme .btn-setup:hover {
+  background: #ffffff;
+  border-color: var(--color-cyan);
+}
+
+.light-theme .btn-setup.active {
+  background: var(--color-cyan) !important;
+  color: #000000 !important;
+  border-color: var(--color-cyan) !important;
+  box-shadow: var(--shadow-neon-cyan);
 }
 
 /* CONTROLLER CARD */
@@ -1079,9 +1110,23 @@ const handleExit = () => {
   height: auto;
   min-height: 54px;
   border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+}
+
+.grid-q-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--color-cyan);
+}
+
+.grid-q-btn.configured {
+  background: rgba(0, 229, 255, 0.08);
+  border-color: rgba(0, 229, 255, 0.25);
 }
 
 .grid-q-btn.active {
+  background: rgba(0, 229, 255, 0.22);
   border-color: var(--color-cyan) !important;
   box-shadow: var(--shadow-neon-cyan);
 }
@@ -1098,12 +1143,13 @@ const handleExit = () => {
   font-family: var(--font-title);
   font-size: 0.95rem;
   font-weight: 800;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .q-tile-badge {
   font-size: 0.6rem;
-  opacity: 0.7;
+  color: var(--text-secondary);
+  opacity: 0.85;
 }
 
 .q-tile-ans {
@@ -1119,7 +1165,34 @@ const handleExit = () => {
   flex: 1;
 }
 
+/* Light Theme Overrides for Grid Question Buttons */
+.light-theme .grid-q-btn {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(15, 23, 42, 0.12);
+  color: var(--text-primary);
+}
+
+.light-theme .grid-q-btn:hover {
+  background: #ffffff;
+  border-color: var(--color-cyan);
+}
+
+.light-theme .grid-q-btn.configured {
+  background: rgba(0, 131, 143, 0.1);
+  border-color: rgba(0, 131, 143, 0.3);
+}
+
+.light-theme .grid-q-btn.active {
+  background: rgba(0, 131, 143, 0.2);
+  border-color: var(--color-cyan) !important;
+  box-shadow: var(--shadow-neon-cyan);
+}
+
 .light-theme .q-tile-number {
-  color: #0f172a;
+  color: var(--text-primary);
+}
+
+.light-theme .q-tile-badge {
+  color: var(--text-secondary);
 }
 </style>

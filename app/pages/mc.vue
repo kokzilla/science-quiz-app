@@ -261,7 +261,8 @@ const pendingTeamsList = computed(() => {
                 :class="{ 
                   'active-tile': selectedQuestion === i,
                   'completed-tile': questionStatsSummary[i]?.submitted === teams.length,
-                  'empty-tile': questionStatsSummary[i]?.submitted === 0
+                  'in-progress-tile': (questionStatsSummary[i]?.submitted || 0) > 0 && (questionStatsSummary[i]?.submitted || 0) < teams.length,
+                  'empty-tile': (questionStatsSummary[i]?.submitted || 0) === 0
                 }"
                 @click="selectedQuestion = i"
               >
@@ -275,7 +276,7 @@ const pendingTeamsList = computed(() => {
                   <div 
                     class="tile-bar-fill"
                     :style="`width: ${teams.length > 0 ? (questionStatsSummary[i]?.submitted / teams.length) * 100 : 0}%`"
-                    :class="questionStatsSummary[i]?.submitted === teams.length ? 'fill-success' : 'fill-cyan'"
+                    :class="questionStatsSummary[i]?.submitted === teams.length ? 'fill-success' : 'fill-warning'"
                   ></div>
                 </div>
               </div>
@@ -284,7 +285,7 @@ const pendingTeamsList = computed(() => {
             <!-- Dashboard Legend labels -->
             <div class="dashboard-legend">
               <div class="legend-item"><span class="legend-color bg-success-legend"></span> <span>ครบ (Green)</span></div>
-              <div class="legend-item"><span class="legend-color bg-cyan-legend"></span> <span>กำลังบันทึก (Cyan)</span></div>
+              <div class="legend-item"><span class="legend-color bg-warning-legend"></span> <span>กำลังบันทึก (Orange)</span></div>
               <div class="legend-item"><span class="legend-color bg-grey-legend"></span> <span>ยังไม่เริ่ม (Grey)</span></div>
             </div>
           </div>
@@ -310,7 +311,7 @@ const pendingTeamsList = computed(() => {
                 </div>
                 <div v-else class="badges-grid">
                   <div class="team-badge badge-correct" v-for="team in correctTeamsList" :key="team.id" :title="team.name">
-                    {{ String(team.team_number).padStart(2, '0') }}
+                    {{ Number(team.team_number) }}
                   </div>
                 </div>
               </div>
@@ -714,8 +715,13 @@ const pendingTeamsList = computed(() => {
 }
 
 .completed-tile {
-  background: rgba(0, 230, 118, 0.04);
-  border-color: rgba(0, 230, 118, 0.25);
+  background: rgba(0, 230, 118, 0.1);
+  border-color: rgba(0, 230, 118, 0.35);
+}
+
+.in-progress-tile {
+  background: rgba(255, 145, 0, 0.12);
+  border-color: rgba(255, 145, 0, 0.45);
 }
 
 .empty-tile {
@@ -739,6 +745,10 @@ const pendingTeamsList = computed(() => {
   color: var(--color-success);
 }
 
+.in-progress-tile .tile-progress-ratio {
+  color: var(--color-warning);
+}
+
 .tile-bar-bg {
   width: 100%;
   height: 4px;
@@ -754,6 +764,10 @@ const pendingTeamsList = computed(() => {
 
 .fill-success {
   background-color: var(--color-success);
+}
+
+.fill-warning {
+  background-color: var(--color-warning);
 }
 
 .fill-cyan {
@@ -793,7 +807,7 @@ const pendingTeamsList = computed(() => {
 }
 
 .bg-success-legend { background-color: rgba(0, 230, 118, 0.3); border: 1px solid var(--color-success); }
-.bg-cyan-legend { background-color: rgba(0, 229, 255, 0.2); border: 1px solid var(--color-cyan); }
+.bg-warning-legend { background-color: rgba(255, 145, 0, 0.3); border: 1px solid var(--color-warning); }
 .bg-grey-legend { background-color: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); }
 
 .light-theme .tile-q-name {
