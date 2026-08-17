@@ -138,36 +138,73 @@ body, .glass-card, .scoreboard-row, .btn, .form-input, .navbar {
 }
 
 .light-theme .team-no {
-  color: #0284c7 !important;
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.15), rgba(2, 132, 199, 0.25)) !important;
+  border: 2px solid #0284c7 !important;
+  color: #0369a1 !important;
+  box-shadow: 0 0 12px rgba(2, 132, 199, 0.2) !important;
 }
 
-.light-theme .team-name {
+.light-theme .team-name-text {
   color: #0f172a !important;
+  text-shadow: none !important;
+}
+
+.light-theme .team-school-text {
+  color: #475569 !important;
 }
 
 .light-theme .team-score {
-  color: #0f172a !important;
+  background: rgba(217, 119, 6, 0.15) !important;
+  border: 2px solid rgba(217, 119, 6, 0.5) !important;
+  box-shadow: 0 0 16px rgba(217, 119, 6, 0.2) !important;
+}
+
+.light-theme .team-score .score-num {
+  color: #d97706 !important;
+  text-shadow: none !important;
+}
+
+.light-theme .team-score .score-label {
+  color: #475569 !important;
 }
 
 .light-theme .rank-badge {
   background: #e2e8f0 !important;
-  color: #334155 !important;
+  color: #1e293b !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
 }
 
 .light-theme .scoreboard-row {
-  background: rgba(255, 255, 255, 0.85) !important;
-  box-shadow: 0 4px 15px rgba(15, 23, 42, 0.05) !important;
-  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08) !important;
+  border: 2px solid rgba(15, 23, 42, 0.12) !important;
 }
 
 .light-theme .rank-1 {
-  background: linear-gradient(90deg, rgba(245, 127, 23, 0.14), rgba(255, 255, 255, 0.85)) !important;
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.25), rgba(255, 255, 255, 0.95)) !important;
+  border-color: rgba(217, 119, 6, 0.6) !important;
 }
+.light-theme .rank-1 .rank-badge {
+  background: var(--color-gold) !important;
+  color: #000 !important;
+}
+
 .light-theme .rank-2 {
-  background: linear-gradient(90deg, rgba(148, 163, 184, 0.12), rgba(255, 255, 255, 0.85)) !important;
+  background: linear-gradient(90deg, rgba(148, 163, 184, 0.25), rgba(255, 255, 255, 0.95)) !important;
+  border-color: rgba(148, 163, 184, 0.6) !important;
 }
+.light-theme .rank-2 .rank-badge {
+  background: var(--color-silver) !important;
+  color: #000 !important;
+}
+
 .light-theme .rank-3 {
-  background: linear-gradient(90deg, rgba(205, 127, 50, 0.12), rgba(255, 255, 255, 0.85)) !important;
+  background: linear-gradient(90deg, rgba(205, 127, 50, 0.25), rgba(255, 255, 255, 0.95)) !important;
+  border-color: rgba(205, 127, 50, 0.6) !important;
+}
+.light-theme .rank-3 .rank-badge {
+  background: var(--color-bronze) !important;
+  color: #fff !important;
 }
 
 /* Light Theme Input / Textbox overrides */
@@ -449,19 +486,21 @@ button, input, select, textarea {
 }
 
 .scoreboard-title {
-  font-size: 2.5rem;
+  font-size: clamp(2.4rem, 3.8vw, 4.0rem);
+  font-weight: 900;
   text-transform: uppercase;
   background: linear-gradient(to right, var(--color-cyan), var(--color-purple));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.35rem;
+  text-shadow: 0 0 25px rgba(0, 229, 255, 0.3);
 }
 
 .scoreboard-subtitle {
-  font-size: 1.2rem;
+  font-size: clamp(1.2rem, 1.6vw, 1.8rem);
   color: var(--text-secondary);
   font-family: var(--font-title);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
 }
 
 .scoreboard-grid {
@@ -472,90 +511,122 @@ button, input, select, textarea {
 }
 
 .scoreboard-row {
-  display: grid;
-  grid-template-columns: 110px 1fr 140px 140px;
+  display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1.1rem 1.6rem;
-  background: rgba(20, 24, 48, 0.5);
-  border-left: 4px solid transparent;
-  border-radius: var(--radius-sm);
-  transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  justify-content: space-between;
+  gap: clamp(0.5rem, 0.9vw, 1.0rem);
+  padding: clamp(0.7rem, 1.2vh, 1.0rem) clamp(0.8rem, 1.2vw, 1.3rem);
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(14px);
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  border-radius: 1.15rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  transition: all 0.25s ease;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 /* Rank Highlights */
 .rank-1 {
-  background: linear-gradient(90deg, rgba(255, 214, 0, 0.15), rgba(20, 24, 48, 0.5));
-  border-left-color: var(--color-gold);
-  box-shadow: 0 0 15px rgba(255, 214, 0, 0.1);
+  background: linear-gradient(90deg, rgba(255, 215, 0, 0.22), rgba(15, 23, 42, 0.85)) !important;
+  border-color: rgba(255, 215, 0, 0.6) !important;
+  box-shadow: 0 0 25px rgba(255, 215, 0, 0.25) !important;
 }
 .rank-1 .rank-badge {
-  background: var(--color-gold);
-  color: #000;
-  box-shadow: 0 0 10px var(--color-gold);
+  background: var(--color-gold) !important;
+  color: #000 !important;
+  box-shadow: 0 0 12px var(--color-gold) !important;
 }
 
 .rank-2 {
-  background: linear-gradient(90deg, rgba(224, 224, 224, 0.12), rgba(20, 24, 48, 0.5));
-  border-left-color: var(--color-silver);
+  background: linear-gradient(90deg, rgba(224, 224, 224, 0.18), rgba(15, 23, 42, 0.85)) !important;
+  border-color: rgba(224, 224, 224, 0.5) !important;
+  box-shadow: 0 0 20px rgba(224, 224, 224, 0.15) !important;
 }
 .rank-2 .rank-badge {
-  background: var(--color-silver);
-  color: #000;
+  background: var(--color-silver) !important;
+  color: #000 !important;
 }
 
 .rank-3 {
-  background: linear-gradient(90deg, rgba(205, 127, 50, 0.12), rgba(20, 24, 48, 0.5));
-  border-left-color: var(--color-bronze);
+  background: linear-gradient(90deg, rgba(205, 127, 50, 0.18), rgba(15, 23, 42, 0.85)) !important;
+  border-color: rgba(205, 127, 50, 0.5) !important;
+  box-shadow: 0 0 20px rgba(205, 127, 50, 0.15) !important;
 }
 .rank-3 .rank-badge {
-  background: var(--color-bronze);
-  color: #fff;
+  background: var(--color-bronze) !important;
+  color: #fff !important;
 }
 
 .rank-badge {
-  padding: 0.35rem 0.85rem;
-  height: auto;
-  min-height: 38px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 20px;
+  padding: 0.4rem 0.9rem;
+  border-radius: 9999px;
   font-family: var(--font-body);
-  font-weight: 700;
-  font-size: 1.05rem;
+  font-weight: 800;
+  font-size: clamp(1.05rem, 1.3vw, 1.4rem);
   background: var(--bg-tertiary);
   color: var(--text-primary);
   white-space: nowrap;
   text-align: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
 .team-no {
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.35), rgba(0, 150, 255, 0.45));
+  border: 2px solid #00e5ff;
+  color: #ffffff;
   font-family: var(--font-body);
-  font-weight: 700;
-  color: var(--color-cyan);
-  font-size: 1.15rem;
+  font-weight: 900;
+  font-size: clamp(1.5rem, 2.0vw, 2.3rem);
+  padding: 0.4rem 0.9rem;
+  border-radius: 0.85rem;
   white-space: nowrap;
+  flex-shrink: 0;
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.4);
+  text-align: center;
 }
 
 .team-name {
-  font-size: 1.25rem;
-  font-weight: 600;
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.2rem;
+}
+
+.scoreboard-card-right {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.5rem, 0.8vw, 0.9rem);
+  flex-shrink: 0;
 }
 
 .team-score {
-  font-family: var(--font-title);
-  font-weight: 800;
-  font-size: 1.75rem;
-  text-align: right;
-  color: var(--text-primary);
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  background: rgba(255, 215, 0, 0.18);
+  border: 2px solid rgba(255, 215, 0, 0.6);
+  padding: 0.35rem 0.95rem;
+  border-radius: 0.9rem;
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.35);
+  flex-shrink: 0;
 }
 
-.team-score span {
-  font-size: 1rem;
-  font-weight: 400;
-  color: var(--text-secondary);
-  margin-left: 0.25rem;
+.team-score .score-num {
+  font-size: clamp(2.4rem, 3.4vw, 3.8rem);
+  font-weight: 950;
+  color: #ffd700;
+  line-height: 1;
+  text-shadow: 0 0 20px rgba(255, 215, 0, 0.65);
+}
+
+.team-score .score-label {
+  font-size: clamp(1.05rem, 1.3vw, 1.45rem);
+  font-weight: 800;
+  color: #e2e8f0;
 }
 
 /* ==========================================================================
