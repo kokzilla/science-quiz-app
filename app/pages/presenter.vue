@@ -1766,6 +1766,30 @@ const questionFontSize = computed(() => {
   return 'clamp(2.45rem, 3.0vw, 3.45rem)'
 })
 
+const choiceFontSize = computed(() => {
+  if (!question.value) return 'clamp(3.5rem, 4.6vw, 5.0rem)'
+  const ca = question.value.choice_a ? question.value.choice_a.replace(/<[^>]*>/g, '').length : 0
+  const cb = question.value.choice_b ? question.value.choice_b.replace(/<[^>]*>/g, '').length : 0
+  const cc = question.value.choice_c ? question.value.choice_c.replace(/<[^>]*>/g, '').length : 0
+  const cd = question.value.choice_d ? question.value.choice_d.replace(/<[^>]*>/g, '').length : 0
+  const maxLen = Math.max(ca, cb, cc, cd)
+
+  if (question.value.choices_layout === '1_col') {
+    if (maxLen < 25) return 'clamp(3.6rem, 4.6vw, 5.2rem)'
+    if (maxLen < 50) return 'clamp(3.0rem, 3.9vw, 4.4rem)'
+    if (maxLen < 90) return 'clamp(2.5rem, 3.2vw, 3.7rem)'
+    if (maxLen < 150) return 'clamp(2.1rem, 2.6vw, 3.0rem)'
+    return 'clamp(1.8rem, 2.2vw, 2.5rem)'
+  }
+
+  // 2-column layout (default)
+  if (maxLen < 15) return 'clamp(4.2rem, 5.5vw, 6.2rem)'
+  if (maxLen < 30) return 'clamp(3.6rem, 4.8vw, 5.4rem)'
+  if (maxLen < 55) return 'clamp(3.0rem, 4.0vw, 4.5rem)'
+  if (maxLen < 90) return 'clamp(2.5rem, 3.2vw, 3.6rem)'
+  return 'clamp(2.1rem, 2.6vw, 3.0rem)'
+})
+
 const handleRoundChange = () => {
   loading.value = true
   loadPresentationState()
@@ -2327,7 +2351,7 @@ const handlePageClick = () => {
               }"
             >
               <div class="choice-letter">ก</div>
-              <div class="choice-text" v-html="question.choice_a"></div>
+              <div class="choice-text" :style="{ fontSize: choiceFontSize }" v-html="question.choice_a"></div>
             </div>
 
             <!-- Choice ข -->
@@ -2339,7 +2363,7 @@ const handlePageClick = () => {
               }"
             >
               <div class="choice-letter">ข</div>
-              <div class="choice-text" v-html="question.choice_b"></div>
+              <div class="choice-text" :style="{ fontSize: choiceFontSize }" v-html="question.choice_b"></div>
             </div>
 
             <!-- Choice ค -->
@@ -2351,7 +2375,7 @@ const handlePageClick = () => {
               }"
             >
               <div class="choice-letter">ค</div>
-              <div class="choice-text" v-html="question.choice_c"></div>
+              <div class="choice-text" :style="{ fontSize: choiceFontSize }" v-html="question.choice_c"></div>
             </div>
 
             <!-- Choice ง -->
@@ -2363,7 +2387,7 @@ const handlePageClick = () => {
               }"
             >
               <div class="choice-letter">ง</div>
-              <div class="choice-text" v-html="question.choice_d"></div>
+              <div class="choice-text" :style="{ fontSize: choiceFontSize }" v-html="question.choice_d"></div>
             </div>
           </div>
         </div>
@@ -2383,7 +2407,7 @@ const handlePageClick = () => {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  padding: 0.5rem 1.5rem 5.5rem 1.5rem; /* 5.5rem bottom clearance to prevent stage blockage */
+  padding: 0.5rem 1.2rem 1.2rem 1.2rem; /* Optimized bottom padding to maximize question & choice area */
   overflow: hidden;
   color: var(--text-primary);
   font-family: var(--font-body);
@@ -2550,16 +2574,17 @@ const handlePageClick = () => {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 1.5rem;
+  gap: 1rem;
+  padding: 1.2rem 2.2rem 1.4rem 2.2rem;
   box-sizing: border-box;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0;
 }
 
 .question-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.2rem;
+  margin-bottom: 0;
 }
 
 .question-badge {
@@ -2580,13 +2605,14 @@ const handlePageClick = () => {
 }
 
 .question-body {
-  flex: 1;
+  flex: 0 0 auto;
+  max-height: 38vh;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 1.5rem;
-  padding: 0.5rem 1rem;
+  gap: 0.8rem;
+  padding: 0.3rem 1rem;
 }
 
 .question-text {
@@ -2601,70 +2627,76 @@ const handlePageClick = () => {
 }
 
 .question-image-box {
-  max-height: 25vh;
+  max-height: 22vh;
   overflow: hidden;
   border-radius: var(--radius-sm);
   border: 1px solid var(--glass-border);
 }
 .question-diagram {
-  max-height: 25vh;
+  max-height: 22vh;
   object-fit: contain;
 }
 
 .choices-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5rem 2.2rem;
+  grid-template-rows: 1fr 1fr;
+  gap: 1.4rem 2.2rem;
   width: 100%;
-  margin-bottom: 0.5rem; /* Elevated from card bottom */
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-bottom: 0;
 }
 .choices-grid.layout-1-col {
   grid-template-columns: 1fr;
+  grid-template-rows: repeat(4, 1fr);
   gap: 0.8rem;
   max-width: 100%;
-  margin: 0 auto 0.5rem auto;
+  margin: 0 auto;
   width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .choices-grid.layout-1-col .choice-card {
-  padding: 0.9rem 2.2rem;
-  gap: 1.8rem;
-  min-height: 75px;
+  padding: 0.9rem 2.4rem;
+  gap: 2rem;
+  min-height: 80px;
 }
 .choices-grid.layout-1-col .choice-letter {
-  width: 72px;
-  height: 72px;
-  min-width: 72px;
-  font-size: 3.2rem;
+  width: 80px;
+  height: 80px;
+  min-width: 80px;
+  font-size: 3.8rem;
 }
 .choices-grid.layout-1-col .choice-text {
-  font-size: clamp(2.6rem, 3.5vw, 3.7rem);
+  font-size: clamp(3.0rem, 4.0vw, 4.4rem);
 }
 
 .choice-card {
-  background: linear-gradient(135deg, rgba(24, 29, 56, 0.9), rgba(15, 18, 36, 0.9));
-  border: 2px solid rgba(255, 255, 255, 0.16);
-  padding: 1.6rem 2.8rem;
-  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(24, 29, 56, 0.95), rgba(15, 18, 36, 0.95));
+  border: 2.5px solid rgba(255, 255, 255, 0.22);
+  padding: 1.2rem 2.6rem;
+  border-radius: 22px;
   display: flex;
   align-items: center;
-  gap: 2.4rem;
+  gap: 2.2rem;
   transition: all 0.3s ease;
-  min-height: 120px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  min-height: 105px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .choice-letter {
-  width: 110px;
-  height: 110px;
-  min-width: 110px;
+  width: 105px;
+  height: 105px;
+  min-width: 105px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.12);
+  border: 3px solid rgba(255, 255, 255, 0.28);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-title);
-  font-size: 4.6rem;
+  font-size: 4.8rem;
   font-weight: 900;
   color: #fff;
   transition: all 0.3s ease;
@@ -2672,9 +2704,9 @@ const handlePageClick = () => {
 }
 
 .choice-text {
-  font-size: clamp(3.3rem, 4.2vw, 4.5rem);
-  font-weight: 700;
-  line-height: 1.3;
+  font-size: clamp(3.6rem, 4.8vw, 5.4rem);
+  font-weight: 750;
+  line-height: 1.25;
   word-break: break-word;
   overflow-wrap: break-word;
   flex: 1;
@@ -2790,7 +2822,7 @@ const handlePageClick = () => {
    ========================================================================== */
 @media (max-height: 900px) or (min-aspect-ratio: 1.8/1) {
   .presenter-view {
-    padding: 0.4rem 1.2rem 4rem 1.2rem;
+    padding: 0.4rem 1.2rem 1rem 1.2rem;
   }
   .presenter-card {
     padding: 1.2rem 1.8rem 1.5rem 1.8rem;
@@ -2807,51 +2839,59 @@ const handlePageClick = () => {
     font-size: 2.8rem;
   }
   .text-question-layout {
-    gap: 1rem;
-    margin-bottom: 0.2rem;
+    gap: 0.8rem;
+    padding: 1rem 1.8rem 1.2rem 1.8rem;
+    margin-bottom: 0;
+  }
+  .question-header {
+    margin-bottom: 0;
   }
   .question-badge {
     font-size: 2.2rem;
     padding: 0.3rem 1.6rem;
   }
+  .question-body {
+    padding: 0.2rem 0.8rem;
+    gap: 0.6rem;
+  }
   .question-image-box, .question-diagram {
-    max-height: 20vh !important;
+    max-height: 18vh !important;
   }
   .choices-grid {
-    gap: 1.1rem 1.5rem;
-    margin-bottom: 0.2rem;
+    gap: 1rem 1.6rem;
+    margin-bottom: 0;
   }
   .choice-card {
-    padding: 1.1rem 2rem;
+    padding: 0.9rem 2rem;
     gap: 1.8rem;
-    min-height: 95px;
+    min-height: 90px;
   }
   .choice-letter {
     width: 90px;
     height: 90px;
     min-width: 90px;
-    font-size: 3.8rem;
+    font-size: 4.2rem;
   }
   .choice-text {
-    font-size: clamp(2.7rem, 3.3vw, 3.5rem);
+    font-size: clamp(3.0rem, 3.8vw, 4.2rem);
   }
   .choices-grid.layout-1-col {
     gap: 0.6rem;
-    margin-bottom: 0.2rem;
+    margin-bottom: 0;
   }
   .choices-grid.layout-1-col .choice-card {
     padding: 0.7rem 1.8rem;
     gap: 1.4rem;
-    min-height: 65px;
+    min-height: 68px;
   }
   .choices-grid.layout-1-col .choice-letter {
-    width: 62px;
-    height: 62px;
-    min-width: 62px;
-    font-size: 2.7rem;
+    width: 68px;
+    height: 68px;
+    min-width: 68px;
+    font-size: 3.2rem;
   }
   .choices-grid.layout-1-col .choice-text {
-    font-size: clamp(2.1rem, 2.7vw, 2.9rem);
+    font-size: clamp(2.4rem, 3.2vw, 3.5rem);
   }
   .timer-overlay {
     top: 0.8rem;
@@ -2868,7 +2908,7 @@ const handlePageClick = () => {
 
 @media (max-height: 720px) {
   .presenter-view {
-    padding: 0.3rem 0.8rem 3rem 0.8rem;
+    padding: 0.3rem 0.8rem 1rem 0.8rem;
   }
   .presenter-card {
     padding: 0.8rem 1.2rem;
@@ -2884,8 +2924,12 @@ const handlePageClick = () => {
   .correct-team-badge {
     font-size: 2.2rem;
   }
+  .text-question-layout {
+    gap: 0.6rem;
+    padding: 0.6rem 1.2rem;
+  }
   .question-header {
-    margin-bottom: 0.2rem;
+    margin-bottom: 0;
   }
   .question-badge {
     font-size: 1.8rem;
@@ -2894,19 +2938,23 @@ const handlePageClick = () => {
   .question-points {
     font-size: 1.6rem;
   }
+  .question-body {
+    padding: 0.2rem 0.5rem;
+    gap: 0.4rem;
+  }
   .choice-card {
     padding: 0.8rem 1.6rem;
     gap: 1.4rem;
-    min-height: 80px;
+    min-height: 75px;
   }
   .choice-letter {
-    width: 72px;
-    height: 72px;
-    min-width: 72px;
-    font-size: 2.8rem;
+    width: 75px;
+    height: 75px;
+    min-width: 75px;
+    font-size: 3.2rem;
   }
   .choice-text {
-    font-size: 2.3rem;
+    font-size: 2.6rem;
   }
   .choices-grid.layout-1-col {
     gap: 0.5rem;
@@ -2917,13 +2965,13 @@ const handlePageClick = () => {
     min-height: 55px;
   }
   .choices-grid.layout-1-col .choice-letter {
-    width: 52px;
-    height: 52px;
-    min-width: 52px;
-    font-size: 2.3rem;
+    width: 55px;
+    height: 55px;
+    min-width: 55px;
+    font-size: 2.5rem;
   }
   .choices-grid.layout-1-col .choice-text {
-    font-size: 1.8rem;
+    font-size: 2.0rem;
   }
 }
 
@@ -3505,83 +3553,86 @@ const handlePageClick = () => {
 
 /* Sample Question Screen Styles */
 .sample-q-container {
-  padding: 2rem 3rem 4.5rem 3rem;
-  min-height: calc(100vh - 7rem);
+  padding: 1.5rem 2.5rem 1.5rem 2.5rem;
+  min-height: calc(100vh - 4rem);
   flex: 1;
   height: 100%;
   animation: fadeIn 0.5s ease-out;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .sample-badge {
   background: rgba(213, 0, 249, 0.18);
   border: 1.5px solid rgba(213, 0, 249, 0.4);
   color: var(--color-purple);
-  padding: 0.6rem 2.5rem;
+  padding: 0.5rem 2.2rem;
   border-radius: 30px;
   font-size: 2.2rem;
   font-weight: 800;
   align-self: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
   letter-spacing: 1px;
 }
 
 .sample-q-text {
-  font-size: clamp(4.4rem, 5.6vw, 6.2rem);
+  font-size: clamp(4.0rem, 5.0vw, 5.8rem);
   font-weight: 750;
   color: #fff;
   text-align: center;
-  margin-bottom: 1.5rem;
-  line-height: 1.35;
+  margin-bottom: 0.8rem;
+  line-height: 1.3;
   filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.5));
 }
 
 .sample-choices-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5rem 2.2rem;
+  grid-template-rows: 1fr 1fr;
+  gap: 1.4rem 2.2rem;
   width: 100%;
-  margin-bottom: 0.5rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-bottom: 0;
 }
 
 .sample-choice-card {
-  background: linear-gradient(135deg, rgba(24, 29, 56, 0.9), rgba(15, 18, 36, 0.9));
-  border: 2px solid rgba(255, 255, 255, 0.16);
-  padding: 1.6rem 2.8rem;
-  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(24, 29, 56, 0.95), rgba(15, 18, 36, 0.95));
+  border: 2.5px solid rgba(255, 255, 255, 0.22);
+  padding: 1.2rem 2.6rem;
+  border-radius: 22px;
   display: flex;
   align-items: center;
-  gap: 2.4rem;
+  gap: 2.2rem;
   transition: all 0.3s ease;
-  min-height: 120px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  min-height: 105px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .sample-choice-letter {
-  width: 110px;
-  height: 110px;
-  min-width: 110px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.2);
+  width: 105px;
+  height: 105px;
+  min-width: 105px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 3px solid rgba(255, 255, 255, 0.28);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-title);
-  font-size: 4.6rem;
+  font-size: 4.8rem;
   font-weight: 900;
   color: #fff;
   flex-shrink: 0;
 }
 
 .sample-choice-text {
-  font-size: clamp(3.6rem, 4.5vw, 4.8rem);
-  font-weight: 700;
+  font-size: clamp(3.8rem, 4.8vw, 5.4rem);
+  font-weight: 750;
   color: #fff;
-  line-height: 1.3;
+  line-height: 1.25;
 }
 
 .sample-choice-card.correct {
@@ -3780,18 +3831,18 @@ const handlePageClick = () => {
     margin-bottom: 1rem;
   }
   .sample-choice-card {
-    padding: 1.1rem 2rem;
+    padding: 0.9rem 2rem;
     gap: 1.8rem;
-    min-height: 95px;
+    min-height: 90px;
   }
   .sample-choice-letter {
     width: 90px;
     height: 90px;
     min-width: 90px;
-    font-size: 3.8rem;
+    font-size: 4.2rem;
   }
   .sample-choice-text {
-    font-size: clamp(3.0rem, 3.6vw, 3.8rem);
+    font-size: clamp(3.2rem, 4.0vw, 4.4rem);
   }
   .get-ready-subtitle {
     font-size: 2.8rem;
