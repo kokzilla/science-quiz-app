@@ -1733,37 +1733,37 @@ const enableAudio = () => {
 }
 
 const questionFontSize = computed(() => {
-  if (!question.value || !question.value.question_text) return '4.5rem'
+  if (!question.value || !question.value.question_text) return '4.8rem'
   const hasImg = !!question.value.question_image_url
   const len = question.value.question_text.length
 
   if (question.value.choices_layout === '1_col') {
     if (hasImg) {
-      if (len < 50) return 'clamp(2.8rem, 3.5vw, 4.2rem)'
-      if (len < 100) return 'clamp(2.3rem, 2.9vw, 3.5rem)'
-      if (len < 180) return 'clamp(1.9rem, 2.3vw, 2.9rem)'
-      return 'clamp(1.7rem, 2.0vw, 2.4rem)'
+      if (len < 50) return 'clamp(3.0rem, 3.8vw, 4.4rem)'
+      if (len < 100) return 'clamp(2.5rem, 3.2vw, 3.8rem)'
+      if (len < 180) return 'clamp(2.1rem, 2.6vw, 3.2rem)'
+      return 'clamp(1.85rem, 2.2vw, 2.6rem)'
     }
 
-    if (len < 40) return 'clamp(4.2rem, 5.5vw, 6.3rem)'
-    if (len < 90) return 'clamp(3.6rem, 4.7vw, 5.3rem)'
-    if (len < 160) return 'clamp(3.0rem, 3.8vw, 4.4rem)'
-    if (len < 240) return 'clamp(2.35rem, 3.0vw, 3.55rem)'
-    return 'clamp(1.95rem, 2.4vw, 2.95rem)'
+    if (len < 40) return 'clamp(4.5rem, 5.8vw, 6.6rem)'
+    if (len < 90) return 'clamp(3.8rem, 5.0vw, 5.6rem)'
+    if (len < 160) return 'clamp(3.2rem, 4.1vw, 4.7rem)'
+    if (len < 240) return 'clamp(2.55rem, 3.3vw, 3.8rem)'
+    return 'clamp(2.1rem, 2.6vw, 3.15rem)'
   }
 
   if (hasImg) {
-    if (len < 50) return 'clamp(3.3rem, 4.1vw, 4.9rem)'
-    if (len < 100) return 'clamp(2.7rem, 3.5vw, 4.1rem)'
-    if (len < 180) return 'clamp(2.3rem, 2.9vw, 3.5rem)'
-    return 'clamp(2.0rem, 2.5vw, 2.9rem)'
+    if (len < 50) return 'clamp(3.5rem, 4.4vw, 5.2rem)'
+    if (len < 100) return 'clamp(2.9rem, 3.8vw, 4.4rem)'
+    if (len < 180) return 'clamp(2.5rem, 3.2vw, 3.8rem)'
+    return 'clamp(2.15rem, 2.7vw, 3.1rem)'
   }
 
-  if (len < 40) return 'clamp(4.7rem, 6.3vw, 7.0rem)'
-  if (len < 90) return 'clamp(4.1rem, 5.3vw, 5.9rem)'
-  if (len < 160) return 'clamp(3.5rem, 4.5vw, 5.1rem)'
-  if (len < 240) return 'clamp(2.85rem, 3.6vw, 4.05rem)'
-  return 'clamp(2.45rem, 3.0vw, 3.45rem)'
+  if (len < 40) return 'clamp(5.0rem, 6.6vw, 7.4rem)'
+  if (len < 90) return 'clamp(4.3rem, 5.6vw, 6.2rem)'
+  if (len < 160) return 'clamp(3.7rem, 4.8vw, 5.4rem)'
+  if (len < 240) return 'clamp(3.05rem, 3.9vw, 4.35rem)'
+  return 'clamp(2.6rem, 3.3vw, 3.65rem)'
 })
 
 const choiceFontSize = computed(() => {
@@ -2325,12 +2325,12 @@ const handlePageClick = () => {
 
         <!-- 4. DYNAMIC TEXT/HTML MODE (Solution 3) -->
         <div v-else class="presenter-card text-question-layout" :class="{ 'invisible-during-intro': showQuestionIntro }">
-          <!-- Header info -->
-          <div class="question-header">
-            <span class="question-badge">ข้อที่ {{ question.question_number }}</span>
+          <!-- Top Left Question Number Badge -->
+          <div class="question-badge-corner">
+            <span class="question-badge">{{ question.question_number }}</span>
           </div>
 
-          <!-- Question Text -->
+          <!-- Question Body with Centered Question in top area -->
           <div class="question-body">
             <h1 class="question-text" :style="{ fontSize: questionFontSize }" v-html="question.question_text"></h1>
             
@@ -2574,45 +2574,51 @@ const handlePageClick = () => {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 1.2rem 2.2rem 1.4rem 2.2rem;
+  gap: 0.6rem;
+  padding: 0.6rem 1.8rem 0.8rem 1.8rem;
   box-sizing: border-box;
   margin-bottom: 0;
+  position: relative;
 }
 
-.question-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0;
+.question-badge-corner {
+  position: absolute;
+  top: 0.8rem;
+  left: 1.5rem;
+  z-index: 15;
 }
 
 .question-badge {
-  background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
-  color: #000;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(0, 195, 255, 0.9), rgba(168, 85, 247, 0.9));
+  color: #ffffff;
   font-family: var(--font-title);
   font-weight: 900;
-  font-size: 2.6rem;
-  padding: 0.4rem 2.2rem;
-  border-radius: var(--radius-sm);
-}
-
-.question-points {
-  color: var(--color-gold);
-  font-family: var(--font-title);
-  font-size: 1.8rem;
-  font-weight: 800;
+  font-size: 3.6rem;
+  min-width: 80px;
+  height: 75px;
+  padding: 0 1rem;
+  border-radius: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: 0 6px 22px rgba(0, 229, 255, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
 }
 
 .question-body {
   flex: 0 0 auto;
-  max-height: 38vh;
+  max-height: 48vh;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 0.8rem;
-  padding: 0.3rem 1rem;
+  gap: 0.5rem;
+  padding: 0.1rem 150px; /* Equal horizontal padding keeps text centered and clear of corner badge & timer */
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .question-text {
@@ -2620,10 +2626,11 @@ const handlePageClick = () => {
   text-align: center;
   line-height: 1.3;
   color: #fff;
-  max-width: 98%;
+  width: 100%;
   word-break: break-word;
   overflow-wrap: break-word;
   filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.5));
+  margin: 0;
 }
 
 .question-image-box {
@@ -2631,6 +2638,8 @@ const handlePageClick = () => {
   overflow: hidden;
   border-radius: var(--radius-sm);
   border: 1px solid var(--glass-border);
+  align-self: center;
+  margin-top: 0.3rem;
 }
 .question-diagram {
   max-height: 22vh;
@@ -2641,7 +2650,7 @@ const handlePageClick = () => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
-  gap: 1.4rem 2.2rem;
+  gap: 0.9rem 1.8rem;
   width: 100%;
   flex: 1 1 auto;
   min-height: 0;
@@ -2650,7 +2659,7 @@ const handlePageClick = () => {
 .choices-grid.layout-1-col {
   grid-template-columns: 1fr;
   grid-template-rows: repeat(4, 1fr);
-  gap: 0.8rem;
+  gap: 0.5rem;
   max-width: 100%;
   margin: 0 auto;
   width: 100%;
@@ -2658,15 +2667,16 @@ const handlePageClick = () => {
   min-height: 0;
 }
 .choices-grid.layout-1-col .choice-card {
-  padding: 0.9rem 2.4rem;
-  gap: 2rem;
-  min-height: 80px;
+  padding: 0.5rem 2.0rem;
+  gap: 1.6rem;
+  min-height: 65px;
 }
 .choices-grid.layout-1-col .choice-letter {
-  width: 80px;
-  height: 80px;
-  min-width: 80px;
-  font-size: 3.8rem;
+  width: 75px;
+  height: 75px;
+  min-width: 75px;
+  font-size: 4.2rem;
+  border-radius: 14px;
 }
 .choices-grid.layout-1-col .choice-text {
   font-size: clamp(3.0rem, 4.0vw, 4.4rem);
@@ -2675,32 +2685,34 @@ const handlePageClick = () => {
 .choice-card {
   background: linear-gradient(135deg, rgba(24, 29, 56, 0.95), rgba(15, 18, 36, 0.95));
   border: 2.5px solid rgba(255, 255, 255, 0.22);
-  padding: 1.2rem 2.6rem;
-  border-radius: 22px;
+  padding: 0.8rem 2.2rem;
+  border-radius: 20px;
   display: flex;
   align-items: center;
-  gap: 2.2rem;
+  gap: 1.8rem;
   transition: all 0.3s ease;
-  min-height: 105px;
+  min-height: 85px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .choice-letter {
-  width: 105px;
-  height: 105px;
-  min-width: 105px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.12);
-  border: 3px solid rgba(255, 255, 255, 0.28);
+  width: 95px;
+  height: 95px;
+  min-width: 95px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08));
+  border: 2.5px solid rgba(255, 255, 255, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-title);
-  font-size: 4.8rem;
+  font-size: 5.4rem;
   font-weight: 900;
   color: #fff;
   transition: all 0.3s ease;
   flex-shrink: 0;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
 .choice-text {
@@ -2843,52 +2855,58 @@ const handlePageClick = () => {
     padding: 1rem 1.8rem 1.2rem 1.8rem;
     margin-bottom: 0;
   }
-  .question-header {
-    margin-bottom: 0;
+  .question-badge-corner {
+    top: 1rem;
+    left: 1.4rem;
   }
   .question-badge {
-    font-size: 2.2rem;
-    padding: 0.3rem 1.6rem;
+    font-size: 3.0rem;
+    min-width: 70px;
+    height: 65px;
+    border-radius: 15px;
+    padding: 0 0.8rem;
   }
   .question-body {
-    padding: 0.2rem 0.8rem;
+    padding: 0.2rem 130px;
     gap: 0.6rem;
   }
   .question-image-box, .question-diagram {
     max-height: 18vh !important;
   }
   .choices-grid {
-    gap: 1rem 1.6rem;
+    gap: 0.8rem 1.4rem;
     margin-bottom: 0;
   }
   .choice-card {
-    padding: 0.9rem 2rem;
-    gap: 1.8rem;
-    min-height: 90px;
+    padding: 0.6rem 1.6rem;
+    gap: 1.4rem;
+    min-height: 75px;
   }
   .choice-letter {
-    width: 90px;
-    height: 90px;
-    min-width: 90px;
-    font-size: 4.2rem;
+    width: 82px;
+    height: 82px;
+    min-width: 82px;
+    font-size: 4.6rem;
+    border-radius: 14px;
   }
   .choice-text {
-    font-size: clamp(3.0rem, 3.8vw, 4.2rem);
+    font-size: clamp(2.8rem, 3.6vw, 4.0rem);
   }
   .choices-grid.layout-1-col {
-    gap: 0.6rem;
+    gap: 0.5rem;
     margin-bottom: 0;
   }
   .choices-grid.layout-1-col .choice-card {
-    padding: 0.7rem 1.8rem;
-    gap: 1.4rem;
-    min-height: 68px;
+    padding: 0.5rem 1.4rem;
+    gap: 1.2rem;
+    min-height: 58px;
   }
   .choices-grid.layout-1-col .choice-letter {
-    width: 68px;
-    height: 68px;
-    min-width: 68px;
-    font-size: 3.2rem;
+    width: 65px;
+    height: 65px;
+    min-width: 65px;
+    font-size: 3.6rem;
+    border-radius: 12px;
   }
   .choices-grid.layout-1-col .choice-text {
     font-size: clamp(2.4rem, 3.2vw, 3.5rem);
@@ -2908,10 +2926,10 @@ const handlePageClick = () => {
 
 @media (max-height: 720px) {
   .presenter-view {
-    padding: 0.3rem 0.8rem 1rem 0.8rem;
+    padding: 0.25rem 0.6rem 0.6rem 0.6rem;
   }
   .presenter-card {
-    padding: 0.8rem 1.2rem;
+    padding: 0.6rem 1rem;
   }
   .correct-teams-container {
     min-height: 400px;
@@ -2925,50 +2943,53 @@ const handlePageClick = () => {
     font-size: 2.2rem;
   }
   .text-question-layout {
-    gap: 0.6rem;
-    padding: 0.6rem 1.2rem;
+    gap: 0.4rem;
+    padding: 0.4rem 1rem;
   }
-  .question-header {
-    margin-bottom: 0;
+  .question-badge-corner {
+    top: 0.6rem;
+    left: 0.8rem;
   }
   .question-badge {
-    font-size: 1.8rem;
-    padding: 0.25rem 1.2rem;
-  }
-  .question-points {
-    font-size: 1.6rem;
+    font-size: 2.3rem;
+    min-width: 55px;
+    height: 50px;
+    border-radius: 12px;
+    padding: 0 0.6rem;
   }
   .question-body {
-    padding: 0.2rem 0.5rem;
-    gap: 0.4rem;
+    padding: 0.1rem 90px;
+    gap: 0.3rem;
   }
   .choice-card {
-    padding: 0.8rem 1.6rem;
-    gap: 1.4rem;
-    min-height: 75px;
+    padding: 0.5rem 1.2rem;
+    gap: 1.2rem;
+    min-height: 60px;
   }
   .choice-letter {
-    width: 75px;
-    height: 75px;
-    min-width: 75px;
-    font-size: 3.2rem;
+    width: 68px;
+    height: 68px;
+    min-width: 68px;
+    font-size: 3.8rem;
+    border-radius: 12px;
   }
   .choice-text {
-    font-size: 2.6rem;
+    font-size: 2.4rem;
   }
   .choices-grid.layout-1-col {
-    gap: 0.5rem;
+    gap: 0.4rem;
   }
   .choices-grid.layout-1-col .choice-card {
-    padding: 0.5rem 1.4rem;
-    gap: 1.2rem;
-    min-height: 55px;
+    padding: 0.4rem 1.2rem;
+    gap: 1rem;
+    min-height: 48px;
   }
   .choices-grid.layout-1-col .choice-letter {
-    width: 55px;
-    height: 55px;
-    min-width: 55px;
-    font-size: 2.5rem;
+    width: 48px;
+    height: 48px;
+    min-width: 48px;
+    font-size: 2.6rem;
+    border-radius: 9px;
   }
   .choices-grid.layout-1-col .choice-text {
     font-size: 2.0rem;
@@ -3612,20 +3633,22 @@ const handlePageClick = () => {
 }
 
 .sample-choice-letter {
-  width: 105px;
-  height: 105px;
-  min-width: 105px;
-  background: rgba(255, 255, 255, 0.12);
-  border: 3px solid rgba(255, 255, 255, 0.28);
-  border-radius: 50%;
+  width: 95px;
+  height: 95px;
+  min-width: 95px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08));
+  border: 2.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-title);
-  font-size: 4.8rem;
+  font-size: 5.4rem;
   font-weight: 900;
   color: #fff;
   flex-shrink: 0;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.3);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 
 .sample-choice-text {
