@@ -842,9 +842,9 @@ const speakThankYouMessage = () => {
 }
 
 // ==========================================
-// Scoreboard Display System (14 Teams / Page, 3s Cycle)
+// Scoreboard Display System (8 Teams / Page, 6s Cycle)
 // ==========================================
-const SCOREBOARD_PAGE_SIZE = 14
+const SCOREBOARD_PAGE_SIZE = 8
 const scoreboardPageIndex = ref(0)
 const scoreboardProgressKey = ref(0)
 let scoreboardInterval: any = null
@@ -939,31 +939,31 @@ const currentWelcomeBatch = computed(() => {
 
 // 4 Corner / Peripheral Quadrant Slot Pools (Non-overlapping, keeping center text fully visible)
 const quadrant1Slots = [
-  { top: '8%', left: '3%' },
-  { top: '16%', left: '4%' },
-  { top: '10%', left: '8.5%' },
-  { top: '22%', left: '3.5%' }
+  { top: '6%', left: '2.5%' },
+  { top: '14%', left: '3%' },
+  { top: '8%', left: '4%' },
+  { top: '18%', left: '2.5%' }
 ]
 
 const quadrant2Slots = [
-  { top: '56%', left: '3%' },
-  { top: '68%', left: '4%' },
-  { top: '74%', left: '9.5%' },
-  { top: '62%', left: '8.5%' }
+  { top: '56%', left: '2.5%' },
+  { top: '66%', left: '3%' },
+  { top: '70%', left: '4%' },
+  { top: '60%', left: '3.5%' }
 ]
 
 const quadrant3Slots = [
-  { top: '8%', right: '3%' },
-  { top: '16%', right: '4%' },
-  { top: '10%', right: '8.5%' },
-  { top: '22%', right: '3.5%' }
+  { top: '6%', right: '2.5%' },
+  { top: '14%', right: '3%' },
+  { top: '8%', right: '4%' },
+  { top: '18%', right: '2.5%' }
 ]
 
 const quadrant4Slots = [
-  { top: '56%', right: '3%' },
-  { top: '68%', right: '4%' },
-  { top: '74%', right: '9.5%' },
-  { top: '62%', right: '8.5%' }
+  { top: '56%', right: '2.5%' },
+  { top: '66%', right: '3%' },
+  { top: '70%', right: '4%' },
+  { top: '60%', right: '3.5%' }
 ]
 
 const currentBalloonPositions = ref<{
@@ -972,10 +972,10 @@ const currentBalloonPositions = ref<{
   pos3: Record<string, string>;
   pos4: Record<string, string>;
 }>({
-  pos1: { top: '10%', left: '3.5%' },
-  pos2: { top: '62%', left: '3.5%' },
-  pos3: { top: '10%', right: '3.5%' },
-  pos4: { top: '62%', right: '3.5%' }
+  pos1: { top: '8%', left: '2.5%' },
+  pos2: { top: '60%', left: '2.5%' },
+  pos3: { top: '8%', right: '2.5%' },
+  pos4: { top: '60%', right: '2.5%' }
 })
 
 const randomizeBalloonPositions = () => {
@@ -1732,25 +1732,51 @@ const enableAudio = () => {
   }
 }
 
-const questionFontSize = computed(() => {
-  if (!question.value || !question.value.question_text) return '5.2rem'
+const choiceFontSize = computed(() => {
+  if (!question.value) return 'clamp(3.5rem, 4.6vw, 5.0rem)'
   const hasImg = !!question.value.question_image_url
-  const len = question.value.question_text.length
+  const ca = question.value.choice_a ? question.value.choice_a.replace(/<[^>]*>/g, '').length : 0
+  const cb = question.value.choice_b ? question.value.choice_b.replace(/<[^>]*>/g, '').length : 0
+  const cc = question.value.choice_c ? question.value.choice_c.replace(/<[^>]*>/g, '').length : 0
+  const cd = question.value.choice_d ? question.value.choice_d.replace(/<[^>]*>/g, '').length : 0
+  const qLen = question.value.question_text ? question.value.question_text.length : 0
+  const maxChoiceLen = Math.max(ca, cb, cc, cd)
 
   if (question.value.choices_layout === '1_col') {
+    // Consider both question text length and choice length for a balanced unified size
+    const effectiveLen = Math.max(maxChoiceLen, Math.round(qLen * 0.45))
     if (hasImg) {
-      if (len < 50) return 'clamp(3.4rem, 4.4vw, 4.8rem)'
-      if (len < 100) return 'clamp(2.9rem, 3.7vw, 4.2rem)'
-      if (len < 180) return 'clamp(2.4rem, 3.1vw, 3.6rem)'
-      return 'clamp(2.0rem, 2.6vw, 3.0rem)'
+      if (effectiveLen < 30) return 'clamp(3.5rem, 4.4vw, 5.0rem)'
+      if (effectiveLen < 60) return 'clamp(3.0rem, 3.8vw, 4.3rem)'
+      if (effectiveLen < 100) return 'clamp(2.6rem, 3.3vw, 3.8rem)'
+      return 'clamp(2.2rem, 2.8vw, 3.2rem)'
     }
 
-    if (len < 50) return 'clamp(5.0rem, 6.5vw, 7.2rem)'
-    if (len < 100) return 'clamp(4.2rem, 5.5vw, 6.2rem)'
-    if (len < 180) return 'clamp(3.6rem, 4.6vw, 5.2rem)'
-    if (len < 260) return 'clamp(3.0rem, 3.8vw, 4.4rem)'
-    return 'clamp(2.5rem, 3.2vw, 3.7rem)'
+    if (effectiveLen < 25) return 'clamp(4.2rem, 5.4vw, 6.0rem)'
+    if (effectiveLen < 50) return 'clamp(3.6rem, 4.6vw, 5.2rem)'
+    if (effectiveLen < 90) return 'clamp(3.0rem, 3.9vw, 4.4rem)'
+    if (effectiveLen < 150) return 'clamp(2.5rem, 3.2vw, 3.7rem)'
+    return 'clamp(2.2rem, 2.7vw, 3.1rem)'
   }
+
+  // 2-column layout (default)
+  if (maxChoiceLen < 15) return 'clamp(4.2rem, 5.5vw, 6.2rem)'
+  if (maxChoiceLen < 30) return 'clamp(3.6rem, 4.8vw, 5.4rem)'
+  if (maxChoiceLen < 55) return 'clamp(3.0rem, 4.0vw, 4.5rem)'
+  if (maxChoiceLen < 90) return 'clamp(2.5rem, 3.2vw, 3.6rem)'
+  return 'clamp(2.1rem, 2.6vw, 3.0rem)'
+})
+
+const questionFontSize = computed(() => {
+  if (!question.value || !question.value.question_text) return '5.2rem'
+
+  if (question.value.choices_layout === '1_col') {
+    // 1-column layout: question font size equals choice font size
+    return choiceFontSize.value
+  }
+
+  const hasImg = !!question.value.question_image_url
+  const len = question.value.question_text.length
 
   if (hasImg) {
     if (len < 50) return 'clamp(3.8rem, 4.8vw, 5.5rem)'
@@ -1765,30 +1791,6 @@ const questionFontSize = computed(() => {
   if (len < 180) return 'clamp(4.2rem, 5.4vw, 6.2rem)'
   if (len < 260) return 'clamp(3.5rem, 4.5vw, 5.2rem)'
   return 'clamp(3.0rem, 3.8vw, 4.4rem)'
-})
-
-const choiceFontSize = computed(() => {
-  if (!question.value) return 'clamp(3.5rem, 4.6vw, 5.0rem)'
-  const ca = question.value.choice_a ? question.value.choice_a.replace(/<[^>]*>/g, '').length : 0
-  const cb = question.value.choice_b ? question.value.choice_b.replace(/<[^>]*>/g, '').length : 0
-  const cc = question.value.choice_c ? question.value.choice_c.replace(/<[^>]*>/g, '').length : 0
-  const cd = question.value.choice_d ? question.value.choice_d.replace(/<[^>]*>/g, '').length : 0
-  const maxLen = Math.max(ca, cb, cc, cd)
-
-  if (question.value.choices_layout === '1_col') {
-    if (maxLen < 25) return 'clamp(3.6rem, 4.6vw, 5.2rem)'
-    if (maxLen < 50) return 'clamp(3.0rem, 3.9vw, 4.4rem)'
-    if (maxLen < 90) return 'clamp(2.5rem, 3.2vw, 3.7rem)'
-    if (maxLen < 150) return 'clamp(2.1rem, 2.6vw, 3.0rem)'
-    return 'clamp(1.8rem, 2.2vw, 2.5rem)'
-  }
-
-  // 2-column layout (default)
-  if (maxLen < 15) return 'clamp(4.2rem, 5.5vw, 6.2rem)'
-  if (maxLen < 30) return 'clamp(3.6rem, 4.8vw, 5.4rem)'
-  if (maxLen < 55) return 'clamp(3.0rem, 4.0vw, 4.5rem)'
-  if (maxLen < 90) return 'clamp(2.5rem, 3.2vw, 3.6rem)'
-  return 'clamp(2.1rem, 2.6vw, 3.0rem)'
 })
 
 const handleRoundChange = () => {
@@ -2080,7 +2082,7 @@ const handlePageClick = () => {
           </div>
         </div>
 
-        <!-- E. SCOREBOARD ROTATING DISPLAY (14 TEAMS PER PAGE, 3s INTERVAL) -->
+        <!-- E. SCOREBOARD ROTATING DISPLAY (8 TEAMS PER PAGE, 6s INTERVAL) -->
         <div v-else-if="currentRound.presenter_show_state === 'scoreboard'" class="presenter-card scoreboard-stage-container">
           <!-- Top Header -->
           <div class="scoreboard-stage-header">
@@ -2105,7 +2107,7 @@ const handlePageClick = () => {
             </div>
           </div>
 
-          <!-- 3-Second Timer Progress Line -->
+          <!-- 6-Second Timer Progress Line -->
           <div class="scoreboard-cycle-progress-track" v-if="scoreboardTotalPages > 1">
             <div :key="scoreboardProgressKey" class="scoreboard-cycle-progress-bar"></div>
           </div>
@@ -2115,10 +2117,10 @@ const handlePageClick = () => {
             ยังไม่มีข้อมูลทีมในรอบนี้
           </div>
 
-          <!-- 14-Team Grid Display (2 Columns x 7 Rows) -->
+          <!-- 8-Team Grid Display (2 Columns x 4 Rows) -->
           <div v-else class="scoreboard-grid-wrapper">
             <Transition name="scoreboard-page-fade" mode="out-in">
-              <div :key="scoreboardPageIndex" class="scoreboard-grid-14">
+              <div :key="scoreboardPageIndex" class="scoreboard-grid-8">
                 <div 
                   v-for="team in currentScoreboardTeams" 
                   :key="team.id"
@@ -2180,16 +2182,16 @@ const handlePageClick = () => {
         <div v-else-if="currentRound.presenter_show_state === 'winners'" class="presenter-card winners-stage-container">
           <div class="winners-stage-header">
             <h1 class="winners-congrats-title font-title">
-              <Award :size="48" class="text-gold winner-trophy-icon" />
+              <Award :size="56" class="text-gold winner-trophy-icon" />
               <span>ขอแสดงความยินดี</span>
-              <Award :size="48" class="text-gold winner-trophy-icon" />
+              <Award :size="56" class="text-gold winner-trophy-icon" />
             </h1>
             <h2 class="winners-event-subtitle">
               การแข่งขันตอบปัญหาวิทยาศาสตร์ มหาวิทยาลัยราชภัฏบุรีรัมย์
             </h2>
             <div class="winners-round-meta">
-              <span>ระดับ {{ currentRound.name }}</span>
-              <span v-if="currentRound.round_date || currentRound.date" class="winners-date-text">
+              <span class="winners-round-pill">ระดับ {{ currentRound.name }}</span>
+              <span v-if="currentRound.round_date || currentRound.date" class="winners-date-pill">
                 วันที่ {{ currentRound.round_date || currentRound.date }}
               </span>
             </div>
@@ -2671,14 +2673,14 @@ const handlePageClick = () => {
   min-height: 58px;
 }
 .choices-grid.layout-1-col .choice-letter {
-  width: 68px;
-  height: 68px;
-  min-width: 68px;
-  font-size: 3.8rem;
-  border-radius: 12px;
+  width: 72px;
+  height: 72px;
+  min-width: 72px;
+  font-size: 4.2rem;
+  border-radius: 14px;
 }
 .choices-grid.layout-1-col .choice-text {
-  font-size: clamp(3.0rem, 4.0vw, 4.4rem);
+  font-size: clamp(3.2rem, 4.3vw, 4.8rem);
 }
 
 .choice-card {
@@ -2837,7 +2839,7 @@ const handlePageClick = () => {
 /* ==========================================================================
    WIDESCREEN LED & HIGH ASPECT RATIO OPTIMIZATIONS
    ========================================================================== */
-@media (max-height: 900px) or (min-aspect-ratio: 1.8/1) {
+@media (max-height: 900px) or (min-aspect-ratio: 1.6/1) {
   .presenter-view {
     padding: 0.4rem 1.2rem 1rem 1.2rem;
   }
@@ -3098,29 +3100,35 @@ const handlePageClick = () => {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 4rem 3rem 5rem 3rem;
-  min-height: calc(100vh - 7rem);
-  flex: 1;
+  padding: clamp(0.2rem, 1vh, 1.4rem) clamp(0.5rem, 1.5vw, 1.5rem);
+  min-height: 100%;
   height: 100%;
+  flex: 1;
   animation: fadeIn 0.5s ease-out;
-  gap: 2.2rem;
+  gap: clamp(0.2rem, 0.8vh, 1.2rem);
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .welcome-org-section {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.2rem;
-  margin-bottom: 1.5rem;
+  gap: clamp(0.2rem, 0.6vh, 0.6rem);
+  margin-bottom: clamp(0.1rem, 0.4vh, 0.4rem);
   animation: fadeInDown 0.6s ease-out;
+  flex-shrink: 0;
 }
 
 .welcome-logo {
-  width: 190px;
-  height: 190px;
+  width: clamp(170px, 20vh, 290px);
+  height: clamp(170px, 20vh, 290px);
+  max-width: 25vw;
+  max-height: 22vh;
   object-fit: contain;
-  filter: drop-shadow(0 0 20px rgba(213, 0, 249, 0.25));
+  filter: drop-shadow(0 0 35px rgba(213, 0, 249, 0.35));
   transition: transform 0.5s ease;
+  flex-shrink: 0;
 }
 
 .welcome-logo:hover {
@@ -3129,47 +3137,50 @@ const handlePageClick = () => {
 
 .welcome-org-name {
   font-family: var(--font-body);
-  font-size: clamp(2.4rem, 3.0vw, 3.4rem);
-  font-weight: 700;
+  font-size: clamp(3.2rem, 4.8vh, 6.0rem);
+  font-weight: 800;
   color: var(--text-secondary);
-  letter-spacing: 1px;
+  letter-spacing: 0.8px;
+  line-height: 1.2;
 }
 
 .welcome-title {
   font-family: var(--font-title);
-  font-size: clamp(6.0rem, 7.5vw, 9.0rem);
+  font-size: clamp(8.0rem, 11.5vh, 16.0rem);
   font-weight: 900;
-  line-height: 1.35;
-  padding: 0.1em 0.15em 0.35em 0.15em;
+  line-height: 1.15;
+  padding: 0.05em 0.15em 0.12em 0.15em;
   display: inline-block;
   background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  filter: drop-shadow(0 0 25px rgba(0, 229, 255, 0.2));
-  margin-bottom: 0.5rem;
+  filter: drop-shadow(0 0 40px rgba(0, 229, 255, 0.45));
+  margin-bottom: 0;
 }
 
 .welcome-subtitle {
   font-family: var(--font-body);
-  font-size: clamp(4.4rem, 5.5vw, 6.4rem);
-  font-weight: 800;
+  font-size: clamp(5.2rem, 7.8vh, 10.5rem);
+  font-weight: 900;
   color: var(--text-primary);
-  margin-bottom: 1rem;
+  line-height: 1.18;
+  margin-bottom: 0;
 }
 
 .welcome-date {
   font-family: var(--font-body);
-  font-size: clamp(2.8rem, 3.4vw, 4.0rem);
+  font-size: clamp(2.6rem, 3.8vh, 4.8rem);
   font-weight: 700;
   color: var(--text-secondary);
-  border: 1.5px solid var(--glass-border);
+  border: 2px solid var(--glass-border);
   background: var(--bg-primary);
-  padding: 1.2rem 3.8rem;
-  border-radius: 50px;
+  padding: clamp(0.4rem, 0.9vh, 0.9rem) clamp(2.5rem, 3.5vw, 5rem);
+  border-radius: 60px;
   display: inline-block;
-  margin-top: 1rem;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  margin-top: clamp(0.2rem, 0.4vh, 0.5rem);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
 }
 
 /* Dynamic Team Balloons Random Overlay on Welcome Screen */
@@ -3194,8 +3205,10 @@ const handlePageClick = () => {
 
 .welcome-balloon-orb-random {
   position: absolute;
-  width: clamp(210px, 19vw, 290px);
-  height: clamp(210px, 19vw, 290px);
+  width: clamp(240px, 19vw, 380px);
+  height: clamp(240px, 19vw, 380px);
+  max-width: 32vh;
+  max-height: 32vh;
   border-radius: 50% 50% 50% 50% / 54% 54% 46% 46%;
   display: flex;
   align-items: center;
@@ -3290,15 +3303,15 @@ const handlePageClick = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.8rem 0.8rem 0.6rem 0.8rem;
+  padding: 1.2rem 1.4rem;
 }
 
 .welcome-balloon-name {
   font-family: var(--font-body);
-  font-size: clamp(2.0rem, 2.65vw, 3.4rem);
+  font-size: clamp(2.4rem, 3.5vh, 4.4rem);
   font-weight: 950;
   color: #ffffff;
-  line-height: 1.18;
+  line-height: 1.15;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95), 0 0 22px rgba(0, 0, 0, 0.8);
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -3429,77 +3442,83 @@ const handlePageClick = () => {
   to { opacity: 1; transform: translateY(0); }
 }
 
-@media (max-height: 900px) or (min-aspect-ratio: 1.8/1) {
+@media (max-height: 900px) or (min-aspect-ratio: 1.6/1) {
   .welcome-container {
-    padding: 2.5rem 2rem;
-    min-height: calc(100vh - 5rem);
-    gap: 1.4rem;
+    padding: clamp(0.2rem, 0.8vh, 1rem) 0.5rem;
+    min-height: 100%;
+    gap: clamp(0.2rem, 0.7vh, 0.8rem);
   }
   .welcome-logo {
-    width: 140px;
-    height: 140px;
+    width: clamp(140px, 17vh, 240px);
+    height: clamp(140px, 17vh, 240px);
+    max-height: 18vh;
   }
   .welcome-org-name {
-    font-size: 2.2rem;
+    font-size: clamp(2.8rem, 4.2vh, 5.2rem);
   }
   .welcome-org-section {
-    margin-bottom: 1rem;
-    gap: 0.8rem;
+    margin-bottom: 0;
+    gap: clamp(0.2rem, 0.5vh, 0.5rem);
   }
   .welcome-title {
-    font-size: clamp(5.0rem, 6.0vw, 7.0rem);
-    margin-bottom: 0.5rem;
+    font-size: clamp(7.0rem, 10.5vh, 14.0rem);
+    margin-bottom: 0;
   }
   .welcome-subtitle {
-    font-size: clamp(3.4rem, 4.2vw, 4.8rem);
-    margin-bottom: 0.5rem;
+    font-size: clamp(4.6rem, 7.0vh, 9.0rem);
+    margin-bottom: 0;
   }
   .welcome-date {
-    font-size: 2.4rem;
-    padding: 0.8rem 2.8rem;
+    font-size: clamp(2.2rem, 3.2vh, 4.0rem);
+    padding: clamp(0.4rem, 0.7vh, 0.7rem) clamp(2rem, 2.8vw, 3.5rem);
   }
   .welcome-balloon-orb-random {
-    width: clamp(170px, 16vw, 230px);
-    height: clamp(170px, 16vw, 230px);
+    width: clamp(200px, 16vw, 320px);
+    height: clamp(200px, 16vw, 320px);
+    max-width: 28vh;
+    max-height: 28vh;
   }
   .welcome-balloon-name {
-    font-size: clamp(1.6rem, 2.1vw, 2.6rem);
+    font-size: clamp(2.2rem, 3.4vh, 4.2rem);
   }
 }
 
 @media (max-height: 720px) {
   .welcome-container {
-    padding: 1.5rem 1.5rem;
-    min-height: calc(100vh - 3.5rem);
-    gap: 0.8rem;
+    padding: 0.2rem 0.4rem;
+    min-height: 100%;
+    gap: 0.2rem;
   }
   .welcome-logo {
-    width: 100px;
-    height: 100px;
+    width: 95px;
+    height: 95px;
+    max-height: 14vh;
   }
   .welcome-org-name {
-    font-size: 1.6rem;
+    font-size: 2.2rem;
   }
   .welcome-org-section {
-    margin-bottom: 0.5rem;
-    gap: 0.4rem;
+    margin-bottom: 0;
+    gap: 0.2rem;
   }
   .welcome-title {
-    font-size: 4.2rem;
+    font-size: 4.8rem;
   }
   .welcome-subtitle {
-    font-size: 2.8rem;
+    font-size: 3.4rem;
   }
   .welcome-date {
     font-size: 1.8rem;
-    padding: 0.5rem 2rem;
+    padding: 0.3rem 1.4rem;
   }
   .welcome-balloon-orb-random {
-    width: clamp(140px, 14vw, 180px);
-    height: clamp(140px, 14vw, 180px);
+    width: clamp(150px, 14vw, 220px);
+    height: clamp(150px, 14vw, 220px);
+    max-width: 22vh;
+    max-height: 22vh;
   }
   .welcome-balloon-name {
-    font-size: clamp(1.3rem, 1.6vw, 1.9rem);
+    font-size: clamp(1.6rem, 2.4vh, 2.6rem);
   }
 }
 /* Rules Screen Styles */
@@ -3829,7 +3848,7 @@ const handlePageClick = () => {
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08) !important;
 }
 
-@media (max-height: 900px) or (min-aspect-ratio: 1.8/1) {
+@media (max-height: 900px) or (min-aspect-ratio: 1.6/1) {
   .rules-container, .sample-q-container, .get-ready-container {
     padding: 2.5rem 2rem 3.5rem 2rem;
     min-height: calc(100vh - 5rem);
@@ -3954,54 +3973,72 @@ const handlePageClick = () => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 1rem 2rem 2rem 2rem;
+  padding: clamp(0.5rem, 1.2vh, 1.2rem) clamp(1rem, 2vw, 2rem);
   justify-content: space-between;
   text-align: center;
   position: relative;
   z-index: 20;
+  box-sizing: border-box;
 }
 
 .winners-stage-header {
-  margin-bottom: 0.6rem;
+  margin-bottom: clamp(0.3rem, 0.8vh, 0.8rem);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.35rem;
+  gap: clamp(0.25rem, 0.6vh, 0.6rem);
 }
 
 .winners-congrats-title {
-  font-size: clamp(2.4rem, 4.2vw, 3.8rem);
+  font-size: clamp(4.0rem, 6.8vh, 7.5rem);
   font-weight: 900;
   color: var(--color-gold, #ffd700);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
-  text-shadow: 0 0 25px rgba(255, 215, 0, 0.45);
+  gap: clamp(0.8rem, 1.5vw, 1.8rem);
+  text-shadow: 0 0 35px rgba(255, 215, 0, 0.6);
   margin: 0;
+  line-height: 1.15;
+}
+
+.winner-trophy-icon {
+  width: clamp(36px, 5.5vh, 64px);
+  height: clamp(36px, 5.5vh, 64px);
+  filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.6));
 }
 
 .winners-event-subtitle {
-  font-size: clamp(1.2rem, 1.8vw, 1.65rem);
-  font-weight: 700;
+  font-size: clamp(2.4rem, 3.8vh, 4.4rem);
+  font-weight: 800;
   color: #ffffff;
   margin: 0;
-  opacity: 0.95;
+  opacity: 0.98;
+  line-height: 1.22;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
 }
 
 .winners-round-meta {
-  font-size: clamp(1.2rem, 1.8vw, 1.65rem);
-  font-weight: 600;
+  font-size: clamp(1.8rem, 2.8vh, 3.2rem);
+  font-weight: 700;
   color: var(--color-cyan, #00e5ff);
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
+  gap: clamp(0.8rem, 1.5vw, 1.6rem);
   margin: 0;
+  flex-wrap: wrap;
 }
 
+.winners-round-pill,
+.winners-date-pill,
 .winners-date-text {
   color: var(--color-cyan, #00e5ff);
+  background: rgba(0, 229, 255, 0.14);
+  border: 2px solid rgba(0, 229, 255, 0.45);
+  padding: clamp(0.2rem, 0.5vh, 0.5rem) clamp(1rem, 1.5vw, 1.8rem);
+  border-radius: 9999px;
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.25);
 }
 
 .podiums-stage-grid {
@@ -4050,7 +4087,7 @@ const handlePageClick = () => {
 }
 
 .no-winner-slot {
-  font-size: 1rem;
+  font-size: 1.2rem;
   color: #64748b;
   padding: 1rem;
   background: rgba(255, 255, 255, 0.03);
@@ -4062,8 +4099,8 @@ const handlePageClick = () => {
   flex: 1;
   min-width: 160px;
   max-width: 320px;
-  padding: 0.85rem 1.15rem;
-  border-radius: 0.85rem;
+  padding: clamp(0.7rem, 1.4vh, 1.2rem) clamp(0.9rem, 1.4vw, 1.4rem);
+  border-radius: 1rem;
   backdrop-filter: blur(12px);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
   transition: all 0.3s;
@@ -4092,24 +4129,24 @@ const handlePageClick = () => {
 
 .podium-team-num {
   font-weight: 900;
-  font-size: 0.95rem;
+  font-size: 1.1rem;
   color: var(--color-cyan, #00e5ff);
   font-family: var(--font-title);
 }
 
 .podium-team-name-line {
-  font-weight: 800;
-  font-size: clamp(1.2rem, 1.8vw, 1.7rem);
+  font-weight: 900;
+  font-size: clamp(1.6rem, 2.5vh, 2.6rem);
   color: #ffffff;
-  line-height: 1.35;
+  line-height: 1.25;
   word-break: break-word;
 }
 
 .podium-team-school-line {
-  font-size: clamp(0.9rem, 1.2vw, 1.25rem);
+  font-size: clamp(1.15rem, 1.7vh, 1.75rem);
   color: #e2e8f0;
   opacity: 0.95;
-  line-height: 1.3;
+  line-height: 1.25;
   margin-top: 0.25rem;
   word-break: break-word;
 }
@@ -4135,8 +4172,12 @@ const handlePageClick = () => {
 }
 
 .light-theme .winners-round-meta,
-.light-theme .winners-date-text {
+.light-theme .winners-date-text,
+.light-theme .winners-round-pill,
+.light-theme .winners-date-pill {
   color: var(--color-cyan, #0284c7);
+  background: rgba(2, 132, 199, 0.1);
+  border-color: rgba(2, 132, 199, 0.3);
 }
 
 .podium-pillar {
@@ -4564,23 +4605,24 @@ const handlePageClick = () => {
 }
 
 /* ==========================================
-   SCOREBOARD ROTATING 14-TEAM STAGE STYLES
+   SCOREBOARD ROTATING 8-TEAM STAGE STYLES
    ========================================== */
 .scoreboard-stage-container {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 1.25rem 2rem 1.25rem 2rem;
+  padding: clamp(0.6rem, 1.5vh, 1.4rem) clamp(1rem, 2vw, 2rem);
   justify-content: flex-start;
   position: relative;
   z-index: 20;
+  box-sizing: border-box;
 }
 
 .scoreboard-stage-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.6rem;
+  margin-bottom: clamp(0.3rem, 0.8vh, 0.8rem);
   flex-wrap: nowrap;
   gap: 1rem;
 }
@@ -4588,50 +4630,50 @@ const handlePageClick = () => {
 .scoreboard-header-title-box {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: clamp(0.8rem, 1.5vw, 1.5rem);
 }
 
 .scoreboard-main-title {
-  font-size: clamp(2rem, 3.2vw, 2.75rem);
+  font-size: clamp(2.4rem, 4.0vh, 4.2rem);
   font-weight: 900;
   color: var(--color-cyan, #00e5ff);
   margin: 0;
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  text-shadow: 0 0 20px rgba(0, 229, 255, 0.45);
+  gap: 0.8rem;
+  text-shadow: 0 0 25px rgba(0, 229, 255, 0.5);
 }
 
 .scoreboard-title-icon {
-  font-size: clamp(1.8rem, 2.8vw, 2.5rem);
+  font-size: clamp(2.2rem, 3.6vh, 3.8rem);
 }
 
 .scoreboard-round-badge {
   background: rgba(255, 215, 0, 0.15);
-  border: 1.5px solid rgba(255, 215, 0, 0.45);
+  border: 2px solid rgba(255, 215, 0, 0.5);
   color: #ffd700;
-  font-size: clamp(1.1rem, 1.5vw, 1.35rem);
-  font-weight: 700;
-  padding: 0.35rem 1rem;
+  font-size: clamp(1.4rem, 2.2vh, 2.4rem);
+  font-weight: 800;
+  padding: clamp(0.3rem, 0.6vh, 0.6rem) clamp(1rem, 1.5vw, 1.8rem);
   border-radius: 9999px;
-  box-shadow: 0 0 12px rgba(255, 215, 0, 0.2);
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.25);
 }
 
 .scoreboard-pagination-info {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: clamp(0.6rem, 1vw, 1.2rem);
 }
 
 .page-counter-badge {
-  background: rgba(0, 229, 255, 0.18);
-  border: 1.5px solid rgba(0, 229, 255, 0.45);
+  background: rgba(0, 229, 255, 0.2);
+  border: 2px solid rgba(0, 229, 255, 0.5);
   color: #00e5ff;
-  font-size: clamp(1.1rem, 1.5vw, 1.35rem);
-  font-weight: 700;
-  padding: 0.35rem 1.1rem;
+  font-size: clamp(1.4rem, 2.2vh, 2.4rem);
+  font-weight: 800;
+  padding: clamp(0.3rem, 0.6vh, 0.6rem) clamp(1rem, 1.5vw, 1.8rem);
   border-radius: 9999px;
-  box-shadow: 0 0 12px rgba(0, 229, 255, 0.25);
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.3);
 }
 
 .page-counter-badge strong {
@@ -4641,23 +4683,23 @@ const handlePageClick = () => {
 
 .team-range-badge {
   color: #94a3b8;
-  font-size: clamp(0.95rem, 1.3vw, 1.15rem);
-  font-weight: 600;
+  font-size: clamp(1.2rem, 1.8vh, 1.9rem);
+  font-weight: 700;
 }
 
 .scoreboard-cycle-progress-track {
   width: 100%;
-  height: 5px;
+  height: 6px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   overflow: hidden;
-  margin-bottom: 0.85rem;
+  margin-bottom: clamp(0.4rem, 1vh, 1rem);
 }
 
 .scoreboard-cycle-progress-bar {
   height: 100%;
   background: linear-gradient(90deg, #00e5ff, #ffd700);
-  box-shadow: 0 0 10px rgba(0, 229, 255, 0.6);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
   width: 0%;
   animation: progressFillScoreboard 6s linear forwards;
 }
@@ -4668,7 +4710,7 @@ const handlePageClick = () => {
 }
 
 .no-teams-scoreboard {
-  font-size: 1.5rem;
+  font-size: 2rem;
   color: #64748b;
   text-align: center;
   padding: 4rem;
@@ -4682,11 +4724,12 @@ const handlePageClick = () => {
   justify-content: center;
 }
 
+.scoreboard-grid-8,
 .scoreboard-grid-14 {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: repeat(7, 1fr);
-  gap: 0.55rem 1.15rem;
+  grid-template-rows: repeat(4, 1fr);
+  gap: clamp(0.6rem, 1.3vh, 1.4rem) clamp(1.0rem, 1.8vw, 2.2rem);
   height: 100%;
 }
 
@@ -4694,12 +4737,12 @@ const handlePageClick = () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.45rem 1.15rem;
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(12px);
-  border: 1.5px solid rgba(255, 255, 255, 0.14);
-  border-radius: 0.85rem;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  padding: clamp(0.6rem, 1.4vh, 1.4rem) clamp(1.2rem, 1.8vw, 2.2rem);
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(14px);
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  border-radius: 1.25rem;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
   transition: all 0.25s ease;
   min-height: 0;
 }
@@ -4707,22 +4750,22 @@ const handlePageClick = () => {
 .scoreboard-card-left {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
+  gap: clamp(0.8rem, 1.4vw, 1.6rem);
   min-width: 0;
   flex: 1;
 }
 
 .scoreboard-team-num-badge {
-  background: linear-gradient(135deg, rgba(0, 229, 255, 0.25), rgba(0, 150, 255, 0.35));
-  border: 1.5px solid #00e5ff;
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.35), rgba(0, 150, 255, 0.45));
+  border: 2px solid #00e5ff;
   color: #ffffff;
-  font-weight: 800;
-  font-size: clamp(1.15rem, 1.6vw, 1.45rem);
-  padding: 0.25rem 0.75rem;
-  border-radius: 0.65rem;
+  font-weight: 900;
+  font-size: clamp(2.0rem, 3.4vh, 3.6rem);
+  padding: clamp(0.35rem, 0.8vh, 0.75rem) clamp(0.9rem, 1.4vw, 1.6rem);
+  border-radius: 1rem;
   white-space: nowrap;
   flex-shrink: 0;
-  box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+  box-shadow: 0 0 16px rgba(0, 229, 255, 0.45);
 }
 
 .scoreboard-team-name-box {
@@ -4734,30 +4777,31 @@ const handlePageClick = () => {
 }
 
 .scoreboard-team-name {
-  font-size: clamp(1.2rem, 1.75vw, 1.6rem);
-  font-weight: 800;
+  font-size: clamp(2.4rem, 3.8vh, 4.2rem);
+  font-weight: 900;
   color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.25;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  line-height: 1.2;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
 }
 
 .scoreboard-school-name {
-  font-size: clamp(0.9rem, 1.2vw, 1.05rem);
+  font-size: clamp(1.4rem, 2.0vh, 2.2rem);
   color: #94a3b8;
-  font-weight: 600;
+  font-weight: 700;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.2;
+  margin-top: 0.2rem;
 }
 
 .scoreboard-card-right {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: clamp(0.6rem, 1vw, 1.2rem);
   flex-shrink: 0;
   margin-left: 0.75rem;
 }
@@ -4765,36 +4809,36 @@ const handlePageClick = () => {
 .scoreboard-score-badge {
   display: flex;
   align-items: baseline;
-  gap: 0.3rem;
-  background: rgba(255, 215, 0, 0.15);
-  border: 1.5px solid rgba(255, 215, 0, 0.5);
-  padding: 0.25rem 0.85rem;
-  border-radius: 0.75rem;
-  box-shadow: 0 0 14px rgba(255, 215, 0, 0.25);
+  gap: 0.5rem;
+  background: rgba(255, 215, 0, 0.18);
+  border: 2px solid rgba(255, 215, 0, 0.6);
+  padding: clamp(0.35rem, 0.8vh, 0.85rem) clamp(1.2rem, 1.8vw, 2.4rem);
+  border-radius: 1.1rem;
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.35);
 }
 
 .scoreboard-score-num {
-  font-size: clamp(1.85rem, 2.8vw, 2.5rem);
-  font-weight: 900;
+  font-size: clamp(3.6rem, 5.8vh, 6.5rem);
+  font-weight: 950;
   color: #ffd700;
   line-height: 1;
-  text-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+  text-shadow: 0 0 22px rgba(255, 215, 0, 0.65);
 }
 
 .scoreboard-score-unit {
-  font-size: clamp(0.9rem, 1.2vw, 1.05rem);
-  font-weight: 700;
+  font-size: clamp(1.4rem, 2.2vh, 2.4rem);
+  font-weight: 800;
   color: #e2e8f0;
 }
 
 .scoreboard-tiebreak-pill {
-  background: rgba(255, 46, 147, 0.2);
-  border: 1px solid rgba(255, 46, 147, 0.45);
+  background: rgba(255, 46, 147, 0.25);
+  border: 1.5px solid rgba(255, 46, 147, 0.55);
   color: #ff60a8;
-  font-size: 0.85rem;
-  font-weight: 700;
-  padding: 0.2rem 0.5rem;
-  border-radius: 0.5rem;
+  font-size: clamp(1.1rem, 1.6vh, 1.7rem);
+  font-weight: 800;
+  padding: 0.3rem 0.8rem;
+  border-radius: 0.6rem;
   white-space: nowrap;
 }
 
