@@ -1733,37 +1733,38 @@ const enableAudio = () => {
 }
 
 const questionFontSize = computed(() => {
-  if (!question.value || !question.value.question_text) return '4.8rem'
+  if (!question.value || !question.value.question_text) return '5.2rem'
   const hasImg = !!question.value.question_image_url
   const len = question.value.question_text.length
 
   if (question.value.choices_layout === '1_col') {
     if (hasImg) {
-      if (len < 50) return 'clamp(3.0rem, 3.8vw, 4.4rem)'
-      if (len < 100) return 'clamp(2.5rem, 3.2vw, 3.8rem)'
-      if (len < 180) return 'clamp(2.1rem, 2.6vw, 3.2rem)'
-      return 'clamp(1.85rem, 2.2vw, 2.6rem)'
+      if (len < 50) return 'clamp(3.4rem, 4.4vw, 4.8rem)'
+      if (len < 100) return 'clamp(2.9rem, 3.7vw, 4.2rem)'
+      if (len < 180) return 'clamp(2.4rem, 3.1vw, 3.6rem)'
+      return 'clamp(2.0rem, 2.6vw, 3.0rem)'
     }
 
-    if (len < 40) return 'clamp(4.5rem, 5.8vw, 6.6rem)'
-    if (len < 90) return 'clamp(3.8rem, 5.0vw, 5.6rem)'
-    if (len < 160) return 'clamp(3.2rem, 4.1vw, 4.7rem)'
-    if (len < 240) return 'clamp(2.55rem, 3.3vw, 3.8rem)'
-    return 'clamp(2.1rem, 2.6vw, 3.15rem)'
+    if (len < 50) return 'clamp(5.0rem, 6.5vw, 7.2rem)'
+    if (len < 100) return 'clamp(4.2rem, 5.5vw, 6.2rem)'
+    if (len < 180) return 'clamp(3.6rem, 4.6vw, 5.2rem)'
+    if (len < 260) return 'clamp(3.0rem, 3.8vw, 4.4rem)'
+    return 'clamp(2.5rem, 3.2vw, 3.7rem)'
   }
 
   if (hasImg) {
-    if (len < 50) return 'clamp(3.5rem, 4.4vw, 5.2rem)'
-    if (len < 100) return 'clamp(2.9rem, 3.8vw, 4.4rem)'
-    if (len < 180) return 'clamp(2.5rem, 3.2vw, 3.8rem)'
-    return 'clamp(2.15rem, 2.7vw, 3.1rem)'
+    if (len < 50) return 'clamp(3.8rem, 4.8vw, 5.5rem)'
+    if (len < 100) return 'clamp(3.2rem, 4.2vw, 4.8rem)'
+    if (len < 180) return 'clamp(2.7rem, 3.5vw, 4.0rem)'
+    return 'clamp(2.3rem, 3.0vw, 3.4rem)'
   }
 
-  if (len < 40) return 'clamp(5.0rem, 6.6vw, 7.4rem)'
-  if (len < 90) return 'clamp(4.3rem, 5.6vw, 6.2rem)'
-  if (len < 160) return 'clamp(3.7rem, 4.8vw, 5.4rem)'
-  if (len < 240) return 'clamp(3.05rem, 3.9vw, 4.35rem)'
-  return 'clamp(2.6rem, 3.3vw, 3.65rem)'
+  // 2-column layout (default) - has maximum height for question text
+  if (len < 50) return 'clamp(5.6rem, 7.2vw, 8.2rem)'
+  if (len < 100) return 'clamp(4.8rem, 6.2vw, 7.0rem)'
+  if (len < 180) return 'clamp(4.2rem, 5.4vw, 6.2rem)'
+  if (len < 260) return 'clamp(3.5rem, 4.5vw, 5.2rem)'
+  return 'clamp(3.0rem, 3.8vw, 4.4rem)'
 })
 
 const choiceFontSize = computed(() => {
@@ -2574,7 +2575,7 @@ const handlePageClick = () => {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 0.6rem;
+  gap: 0.8rem;
   padding: 0.6rem 1.8rem 0.8rem 1.8rem;
   box-sizing: border-box;
   margin-bottom: 0;
@@ -2609,8 +2610,8 @@ const handlePageClick = () => {
 }
 
 .question-body {
-  flex: 0 0 auto;
-  max-height: 48vh;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -2634,7 +2635,7 @@ const handlePageClick = () => {
 }
 
 .question-image-box {
-  max-height: 22vh;
+  max-height: 24vh;
   overflow: hidden;
   border-radius: var(--radius-sm);
   border: 1px solid var(--glass-border);
@@ -2642,71 +2643,69 @@ const handlePageClick = () => {
   margin-top: 0.3rem;
 }
 .question-diagram {
-  max-height: 22vh;
+  max-height: 24vh;
   object-fit: contain;
 }
 
 .choices-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 0.9rem 1.8rem;
+  grid-template-rows: auto auto;
+  gap: 0.8rem 1.8rem;
   width: 100%;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
   margin-bottom: 0;
 }
 .choices-grid.layout-1-col {
   grid-template-columns: 1fr;
-  grid-template-rows: repeat(4, 1fr);
+  grid-template-rows: repeat(4, auto);
   gap: 0.5rem;
   max-width: 100%;
   margin: 0 auto;
   width: 100%;
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
 }
 .choices-grid.layout-1-col .choice-card {
-  padding: 0.5rem 2.0rem;
-  gap: 1.6rem;
-  min-height: 65px;
+  padding: 0.45rem 1.8rem;
+  gap: 1.4rem;
+  min-height: 58px;
 }
 .choices-grid.layout-1-col .choice-letter {
-  width: 75px;
-  height: 75px;
-  min-width: 75px;
-  font-size: 4.2rem;
-  border-radius: 14px;
+  width: 68px;
+  height: 68px;
+  min-width: 68px;
+  font-size: 3.8rem;
+  border-radius: 12px;
 }
 .choices-grid.layout-1-col .choice-text {
   font-size: clamp(3.0rem, 4.0vw, 4.4rem);
 }
 
 .choice-card {
-  background: linear-gradient(135deg, rgba(24, 29, 56, 0.95), rgba(15, 18, 36, 0.95));
-  border: 2.5px solid rgba(255, 255, 255, 0.22);
-  padding: 0.8rem 2.2rem;
-  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(22, 33, 68, 0.95), rgba(13, 20, 46, 0.98));
+  border: 2.5px solid rgba(0, 229, 255, 0.35);
+  padding: 0.6rem 2.0rem;
+  border-radius: 18px;
   display: flex;
   align-items: center;
-  gap: 1.8rem;
+  gap: 1.6rem;
   transition: all 0.3s ease;
-  min-height: 85px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  min-height: 76px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 229, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .choice-letter {
-  width: 95px;
-  height: 95px;
-  min-width: 95px;
+  width: 90px;
+  height: 90px;
+  min-width: 90px;
   border-radius: 16px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08));
-  border: 2.5px solid rgba(255, 255, 255, 0.35);
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.25), rgba(168, 85, 247, 0.25));
+  border: 2.5px solid rgba(0, 229, 255, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-title);
-  font-size: 5.4rem;
+  font-size: 5.2rem;
   font-weight: 900;
   color: #fff;
   transition: all 0.3s ease;
@@ -2778,15 +2777,17 @@ const handlePageClick = () => {
 }
 
 .light-theme .choice-card {
-  background: #ffffff !important;
-  border-color: rgba(15, 23, 42, 0.18) !important;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  background: linear-gradient(135deg, #eef4fb, #e2ebf6) !important;
+  border: 2px solid rgba(37, 99, 235, 0.3) !important;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
 }
 
 .light-theme .choice-card .choice-letter {
-  background: #e2e8f0 !important;
-  color: #0f172a !important;
-  border-color: #94a3b8 !important;
+  background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
+  color: #ffffff !important;
+  border: 2.5px solid rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3) !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 .light-theme .choice-card .choice-text,
@@ -2795,9 +2796,9 @@ const handlePageClick = () => {
 }
 
 .light-theme .choice-card.correct {
-  background: rgba(0, 230, 118, 0.15) !important;
+  background: rgba(0, 230, 118, 0.2) !important;
   border-color: var(--color-success) !important;
-  box-shadow: 0 0 25px rgba(0, 230, 118, 0.25);
+  box-shadow: 0 0 25px rgba(0, 230, 118, 0.3) !important;
 }
 
 .light-theme .choice-card.correct .choice-letter {
@@ -2808,6 +2809,10 @@ const handlePageClick = () => {
 
 .light-theme .choice-card.correct .choice-text {
   color: #052e16 !important;
+}
+
+.light-theme .choice-card.incorrect {
+  opacity: 0.38 !important;
 }
 
 .light-theme .correct-team-badge {
@@ -3620,8 +3625,8 @@ const handlePageClick = () => {
 }
 
 .sample-choice-card {
-  background: linear-gradient(135deg, rgba(24, 29, 56, 0.95), rgba(15, 18, 36, 0.95));
-  border: 2.5px solid rgba(255, 255, 255, 0.22);
+  background: linear-gradient(135deg, rgba(22, 33, 68, 0.95), rgba(13, 20, 46, 0.98));
+  border: 2.5px solid rgba(0, 229, 255, 0.35);
   padding: 1.2rem 2.6rem;
   border-radius: 22px;
   display: flex;
@@ -3629,15 +3634,15 @@ const handlePageClick = () => {
   gap: 2.2rem;
   transition: all 0.3s ease;
   min-height: 105px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 229, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
 .sample-choice-letter {
   width: 95px;
   height: 95px;
   min-width: 95px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08));
-  border: 2.5px solid rgba(255, 255, 255, 0.35);
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.25), rgba(168, 85, 247, 0.25));
+  border: 2.5px solid rgba(0, 229, 255, 0.5);
   border-radius: 16px;
   display: flex;
   align-items: center;
@@ -3774,15 +3779,17 @@ const handlePageClick = () => {
 }
 
 .light-theme .sample-choice-card {
-  background: #ffffff !important;
-  border-color: rgba(15, 23, 42, 0.18) !important;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  background: linear-gradient(135deg, #eef4fb, #e2ebf6) !important;
+  border: 2px solid rgba(37, 99, 235, 0.3) !important;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
 }
 
 .light-theme .sample-choice-letter {
-  background: #e2e8f0 !important;
-  color: #0f172a !important;
-  border: 2px solid #94a3b8;
+  background: linear-gradient(135deg, #2563eb, #7c3aed) !important;
+  color: #ffffff !important;
+  border: 2.5px solid rgba(255, 255, 255, 0.7) !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3) !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 .light-theme .sample-choice-text {
@@ -3790,9 +3797,9 @@ const handlePageClick = () => {
 }
 
 .light-theme .sample-choice-card.correct {
-  background: rgba(0, 230, 118, 0.15) !important;
+  background: rgba(0, 230, 118, 0.2) !important;
   border-color: var(--color-success) !important;
-  box-shadow: 0 0 25px rgba(0, 230, 118, 0.25);
+  box-shadow: 0 0 25px rgba(0, 230, 118, 0.3);
 }
 
 .light-theme .sample-choice-card.correct .sample-choice-letter {
