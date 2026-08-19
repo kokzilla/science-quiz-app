@@ -6,14 +6,14 @@ import { useTheme } from '~/composables/useTheme'
 import { useRoundSelector } from '~/composables/useRoundSelector'
 import { TOTAL_QUESTIONS } from '~/utils/constants'
 import { 
-  Tv, 
   AlertCircle, 
-  ChevronLeft, 
-  ChevronRight,
   Pause,
   Play,
   Sun,
-  Moon
+  Moon,
+  Volume2,
+  VolumeX,
+  Radio
 } from 'lucide-vue-next'
 import type { Team, Answer, Question } from '~/types'
 
@@ -21,7 +21,7 @@ const { theme, toggleTheme } = useTheme()
 const route = useRoute()
 const { supabase, isConfigured } = useSupabase()
 
-const sortBy = ref<'score' | 'team'>('team')
+const sortBy = ref<'score' | 'team'>('score')
 const teams = ref<Team[]>([])
 const answers = ref<Answer[]>([])
 const questions = ref<Question[]>([])
@@ -30,18 +30,38 @@ const loading = ref(true)
 const errorMsg = ref('')
 const soundEnabled = ref(false)
 
+// Set of team IDs that recently received a real-time update (for flash animation)
+const recentlyUpdatedTeams = ref<Set<string>>(new Set())
+const updateTimeouts = new Map<string, any>()
+
+const flashUpdatedTeam = (teamId: string) => {
+  if (!teamId) return
+  recentlyUpdatedTeams.value.add(teamId)
+  
+  if (updateTimeouts.has(teamId)) {
+    clearTimeout(updateTimeouts.get(teamId))
+  }
+  
+  const timer = setTimeout(() => {
+    recentlyUpdatedTeams.value.delete(teamId)
+    updateTimeouts.delete(teamId)
+  }, 1600)
+  
+  updateTimeouts.set(teamId, timer)
+}
+
 // Realtime subscriptions references
 let answersChannel: any = null
 let roundsChannel: any = null
 let teamsChannel: any = null
+let questionsChannel: any = null
 
 // Smooth Auto-Scrolling State for all teams
 const isAutoScrolling = ref(true)
 let scrollAnimId: number | null = null
 let isPausedForLoop = false
 let loopTimeout: any = null
-let scrollPos = 0
-const scrollSpeed = 0.48 // pixels per frame (smooth, balanced readable scroll)
+const scrollSpeed = 0.85 // pixels per frame (smooth slow scroll)
 
 // Callback when selected round changes
 const onRoundChanged = async (roundId: string) => {
@@ -59,20 +79,10 @@ const {
   handleRoundChange
 } = useRoundSelector(onRoundChanged)
 
-const getMaxScroll = () => {
-  if (typeof document === 'undefined' || typeof window === 'undefined') return 0
-  const doc = document.documentElement
-  const body = document.body
-  const scrollHeight = Math.max(doc ? doc.scrollHeight : 0, body ? body.scrollHeight : 0)
-  const clientHeight = window.innerHeight || (doc ? doc.clientHeight : 0)
-  return Math.max(0, scrollHeight - clientHeight)
-}
-
 const startSmoothScroll = () => {
   stopSmoothScroll()
   if (!isAutoScrolling.value || typeof window === 'undefined') return
 
-  scrollPos = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0
   let lastTime = performance.now()
 
   const step = (time: number) => {
@@ -82,10 +92,12 @@ const startSmoothScroll = () => {
     lastTime = time
 
     if (!isPausedForLoop) {
-      const maxScroll = getMaxScroll()
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight
 
-      if (maxScroll > 15) {
-        if (scrollPos >= maxScroll - 4) {
+      if (maxScroll > 20) {
+        const currentScroll = window.scrollY || window.pageYOffset || document.documentElement.scrollTop
+        
+        if (currentScroll >= maxScroll - 3) {
           // Reached bottom: Pause at bottom for 3.5s so viewers can see the final teams
           isPausedForLoop = true
           loopTimeout = setTimeout(() => {
@@ -94,13 +106,11 @@ const startSmoothScroll = () => {
               return
             }
             // Smoothly scroll back to top
-            scrollPos = 0
             window.scrollTo({ top: 0, behavior: 'smooth' })
             
-            // Pause at top for 3.0s before restarting scroll down
+            // Pause at top for 3s before restarting scroll down
             loopTimeout = setTimeout(() => {
               isPausedForLoop = false
-              scrollPos = 0
               lastTime = performance.now()
               if (isAutoScrolling.value) {
                 scrollAnimId = requestAnimationFrame(step)
@@ -109,10 +119,9 @@ const startSmoothScroll = () => {
           }, 3500)
           return
         } else {
-          // Scroll down continuously using float accumulator so sub-pixel values don't get truncated
+          // Scroll down continuously
           const moveBy = scrollSpeed * Math.min(delta / 16.67, 3)
-          scrollPos += moveBy
-          window.scrollTo(0, scrollPos)
+          window.scrollBy(0, moveBy)
         }
       }
     }
@@ -146,9 +155,8 @@ const toggleAutoScroll = () => {
   }
 }
 
-watch([sortBy, selectedRoundId, loading], () => {
+watch([sortBy, selectedRoundId], () => {
   if (typeof window !== 'undefined') {
-    scrollPos = 0
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   if (isAutoScrolling.value) {
@@ -168,12 +176,27 @@ onMounted(() => {
 onUnmounted(() => {
   cleanupSubscriptions()
   stopSmoothScroll()
+  updateTimeouts.forEach(t => clearTimeout(t))
+  updateTimeouts.clear()
 })
 
 const cleanupSubscriptions = () => {
-  if (answersChannel && supabase.value) supabase.value.removeChannel(answersChannel)
-  if (roundsChannel && supabase.value) supabase.value.removeChannel(roundsChannel)
-  if (teamsChannel && supabase.value) supabase.value.removeChannel(teamsChannel)
+  if (answersChannel && supabase.value) {
+    supabase.value.removeChannel(answersChannel)
+    answersChannel = null
+  }
+  if (roundsChannel && supabase.value) {
+    supabase.value.removeChannel(roundsChannel)
+    roundsChannel = null
+  }
+  if (teamsChannel && supabase.value) {
+    supabase.value.removeChannel(teamsChannel)
+    teamsChannel = null
+  }
+  if (questionsChannel && supabase.value) {
+    supabase.value.removeChannel(questionsChannel)
+    questionsChannel = null
+  }
 }
 
 const loadScoreboardData = async (roundId: string) => {
@@ -185,15 +208,17 @@ const loadScoreboardData = async (roundId: string) => {
       .from('teams')
       .select('*')
       .eq('round_id', roundId)
+      .order('team_number', { ascending: true })
     
     if (tErr) throw tErr
-    teams.value = tData as Team[]
+    teams.value = (tData || []) as Team[]
 
     // 2. Fetch correct answer keys (questions)
     const { data: qData } = await supabase.value
       .from('questions')
       .select('*')
       .eq('round_id', roundId)
+      .order('question_number', { ascending: true })
     questions.value = (qData || []) as Question[]
 
     // 3. Fetch all answers for these teams
@@ -260,9 +285,9 @@ const setupRealtimeSubscriptions = (roundId: string) => {
 
   cleanupSubscriptions()
 
-  // 1. Listen to answers changes
+  // 1. Listen to answers changes in real-time
   answersChannel = supabase.value
-    .channel('scoreboard-answers')
+    .channel('scoreboard-answers-channel')
     .on('postgres_changes', { 
       event: '*', 
       schema: 'public', 
@@ -272,15 +297,22 @@ const setupRealtimeSubscriptions = (roundId: string) => {
       const deleted = payload.old as any
       
       if (payload.eventType === 'INSERT') {
-        answers.value.push(updated)
+        const idx = answers.value.findIndex(a => a.id === updated.id)
+        if (idx > -1) {
+          answers.value.splice(idx, 1, updated)
+        } else {
+          answers.value.push(updated)
+        }
+        flashUpdatedTeam(updated.team_id)
         playChimeSound()
       } else if (payload.eventType === 'UPDATE') {
         const idx = answers.value.findIndex(a => a.id === updated.id)
         if (idx > -1) {
-          answers.value[idx] = updated
+          answers.value.splice(idx, 1, updated)
         } else {
           answers.value.push(updated)
         }
+        flashUpdatedTeam(updated.team_id)
         playChimeSound()
       } else if (payload.eventType === 'DELETE') {
         answers.value = answers.value.filter(a => a.id !== deleted.id)
@@ -288,9 +320,9 @@ const setupRealtimeSubscriptions = (roundId: string) => {
     })
     .subscribe()
 
-  // 2. Listen to round configuration changes (revealed question number)
+  // 2. Listen to round configuration changes
   roundsChannel = supabase.value
-    .channel('scoreboard-rounds')
+    .channel('scoreboard-rounds-channel')
     .on('postgres_changes', { 
       event: 'UPDATE', 
       schema: 'public', 
@@ -298,13 +330,12 @@ const setupRealtimeSubscriptions = (roundId: string) => {
       filter: `id=eq.${roundId}`
     }, (payload: any) => {
       currentRound.value = payload.new
-      playChimeSound()
     })
     .subscribe()
 
-  // 3. Listen to teams changes (tie_breaker score modifications)
+  // 3. Listen to teams changes (tie_breaker score modifications, name edits, additions)
   teamsChannel = supabase.value
-    .channel('scoreboard-teams')
+    .channel('scoreboard-teams-channel')
     .on('postgres_changes', { 
       event: '*', 
       schema: 'public', 
@@ -314,43 +345,62 @@ const setupRealtimeSubscriptions = (roundId: string) => {
       loadScoreboardData(roundId)
     })
     .subscribe()
+
+  // 4. Listen to questions changes (correct answer changes)
+  questionsChannel = supabase.value
+    .channel('scoreboard-questions-channel')
+    .on('postgres_changes', { 
+      event: '*', 
+      schema: 'public', 
+      table: 'questions',
+      filter: `round_id=eq.${roundId}`
+    }, () => {
+      loadScoreboardData(roundId)
+    })
+    .subscribe()
 }
 
 // ==========================================
-// SCORING & LEADERBOARD LOGIC
+// SCORING & LEADERBOARD LOGIC (REAL-TIME)
 // ==========================================
 const leaderboard = computed(() => {
   if (!currentRound.value || teams.value.length === 0) return []
 
-  const revQuestion = currentRound.value.revealed_question_number
+  // Build map of correct answers from questions for instant evaluation fallback
+  const answerKeyMap = new Map<number, string>()
+  questions.value.forEach(q => {
+    if (q.correct_answer) {
+      answerKeyMap.set(q.question_number, q.correct_answer)
+    }
+  })
 
-  // Map each team with their score calculated UP TO the revealed question number
+  // Calculate real-time scores for all teams
   const teamScores = teams.value.map(team => {
-    // Filter answers for this team that are <= revealed question and correct
-    const correctCount = answers.value.filter(ans => {
-      return ans.team_id === team.id && 
-             ans.question_number <= revQuestion && 
-             ans.is_correct
-    }).length
+    const teamAnswers = answers.value.filter(ans => ans.team_id === team.id)
+    let correctCount = 0
+    let answeredCount = 0
 
-    const finalScore = correctCount + team.tie_breaker_score
-
-    // Detail answers map for rendering dots on TV board
-    const answersDetail = Array.from({ length: Math.min(TOTAL_QUESTIONS, revQuestion) }, (_, idx) => {
-      const qNum = idx + 1
-      const ansRow = answers.value.find(a => a.team_id === team.id && a.question_number === qNum)
-      return {
-        question_number: qNum,
-        submitted: !!ansRow?.submitted_answer,
-        is_correct: !!ansRow?.is_correct
+    teamAnswers.forEach(ans => {
+      if (ans.submitted_answer) {
+        answeredCount++
+        if (ans.is_correct) {
+          correctCount++
+        } else {
+          const expected = answerKeyMap.get(ans.question_number)
+          if (expected && ans.submitted_answer === expected) {
+            correctCount++
+          }
+        }
       }
     })
+
+    const finalScore = correctCount + (team.tie_breaker_score || 0)
 
     return {
       ...team,
       correctCount,
-      finalScore,
-      answersDetail
+      answeredCount,
+      finalScore
     }
   })
 
@@ -397,6 +447,11 @@ const formatSchoolName = (schoolName?: string) => {
       <button @click="toggleTheme" class="btn btn-secondary round-icon-btn" :title="theme === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง' : 'เปลี่ยนเป็นโหมดมืด'">
         <Sun v-if="theme === 'light'" :size="18" />
         <Moon v-else :size="18" />
+      </button>
+
+      <button @click="soundEnabled = !soundEnabled" class="btn btn-secondary round-icon-btn" :title="soundEnabled ? 'ปิดเสียงแจ้งเตือนคะแนน' : 'เปิดเสียงแจ้งเตือนคะแนน'">
+        <Volume2 v-if="soundEnabled" :size="18" class="text-cyan" />
+        <VolumeX v-else :size="18" />
       </button>
 
       <div class="control-pill-dropdown">
@@ -446,6 +501,22 @@ const formatSchoolName = (schoolName?: string) => {
     <!-- Main Scoreboard TV Layout -->
     <template v-else-if="currentRound">
       
+      <!-- Top Title Bar (Sticky at top) -->
+      <div class="scoreboard-header">
+        <div class="scoreboard-header-top">
+          <h1 class="scoreboard-title">Scoreboard การแข่งขัน {{ currentRound.name }}</h1>
+          <div class="live-status-pill">
+            <span class="live-dot"></span>
+            <span class="live-text">ถ่ายทอดสดแบบ REALTIME</span>
+          </div>
+        </div>
+        <div class="scoreboard-subtitle">
+          ผลคะแนนสะสมแบบเรียลไทม์
+          - <span class="sort-highlight">เรียงลำดับตาม <span class="text-cyan font-bold">{{ sortBy === 'score' ? 'คะแนนสูงสุด' : 'หมายเลขทีม' }}</span></span>
+          - รวมทั้งสิ้น {{ leaderboard.length }} ทีม (เลื่อนหน้าจออัตโนมัติ)
+        </div>
+      </div>
+
       <!-- TV Leaderboard Table -->
       <div class="scoreboard-grid">
         <div v-if="leaderboard.length === 0" class="empty-scoreboard-prompt">
@@ -457,7 +528,7 @@ const formatSchoolName = (schoolName?: string) => {
             v-for="item in leaderboard" 
             :key="item.id"
             class="scoreboard-row"
-            :class="`rank-${item.rank}`"
+            :class="[`rank-${item.rank}`, { 'score-updated-flash': recentlyUpdatedTeams.has(item.id) }]"
           >
             <!-- Left: Team number badge -->
             <div class="team-no">
@@ -640,7 +711,7 @@ const formatSchoolName = (schoolName?: string) => {
 .scoreboard-view {
   position: relative;
   min-height: 100vh;
-  padding: 4.5rem 1.25rem 4rem 1.25rem;
+  padding: 1rem 1.25rem 4rem 1.25rem;
   width: 100%;
   max-width: 100vw;
   box-sizing: border-box;
@@ -653,11 +724,52 @@ const formatSchoolName = (schoolName?: string) => {
   z-index: 40;
   padding: 1.25rem 1rem 1rem 1rem;
   margin-top: 0;
-  background: rgba(10, 12, 22, 0.92);
+  background: rgba(10, 12, 22, 0.94);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--glass-border);
   margin-bottom: 1.5rem;
   text-align: center;
+}
+
+.scoreboard-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.live-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: rgba(0, 230, 118, 0.15);
+  border: 1.5px solid var(--color-success);
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  box-shadow: 0 0 12px rgba(0, 230, 118, 0.3);
+}
+
+.live-dot {
+  width: 10px;
+  height: 10px;
+  background-color: var(--color-success);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--color-success);
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0.7; }
+}
+
+.live-text {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: var(--color-success);
+  letter-spacing: 0.06em;
 }
 
 .scoreboard-title {
@@ -706,9 +818,31 @@ const formatSchoolName = (schoolName?: string) => {
   border: 2px solid rgba(255, 255, 255, 0.16);
   border-radius: 1.15rem;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-  transition: all 0.25s ease;
+  transition: all 0.3s ease;
   min-width: 0;
   box-sizing: border-box;
+}
+
+/* Flash animation on real-time score update */
+.score-updated-flash {
+  animation: flash-pulse 1.5s ease-out;
+}
+
+@keyframes flash-pulse {
+  0% {
+    transform: scale(1.02);
+    border-color: var(--color-cyan);
+    box-shadow: 0 0 35px rgba(0, 229, 255, 0.8);
+  }
+  50% {
+    transform: scale(1.01);
+    border-color: var(--color-cyan);
+    box-shadow: 0 0 20px rgba(0, 229, 255, 0.4);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  }
 }
 
 .team-no {
