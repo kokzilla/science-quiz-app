@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useSupabase } from '~/composables/useSupabase'
 import { useAuth } from '~/composables/useAuth'
 import { useRoundSelector } from '~/composables/useRoundSelector'
+import { useAnswers } from '~/composables/useAnswers'
 import { TOTAL_QUESTIONS } from '~/utils/constants'
 import { 
   BarChart3, 
@@ -12,15 +13,16 @@ import {
   Check, 
   AlertCircle, 
   Award, 
-  Grid,
-  Sparkles,
-  LogOut
+  Grid, 
+  Sparkles, 
+  LogOut 
 } from 'lucide-vue-next'
 import type { Team, Question, Answer } from '~/types'
 
 const route = useRoute()
 const { supabase, isConfigured } = useSupabase()
 const { validateStaffOrAdmin, logout } = useAuth()
+const { fetchAllRoundAnswers } = useAnswers()
 
 const teams = ref<Team[]>([])
 const questions = ref<Question[]>([])
@@ -55,11 +57,7 @@ const onRoundChanged = async (roundId: string) => {
     // 3. Fetch all answers
     if (teams.value.length > 0) {
       const teamIds = teams.value.map(t => t.id)
-      const { data: aData } = await supabase.value
-        .from('answers')
-        .select('*')
-        .in('team_id', teamIds)
-      answers.value = (aData || []) as Answer[]
+      answers.value = await fetchAllRoundAnswers(roundId, teamIds)
     } else {
       answers.value = []
     }

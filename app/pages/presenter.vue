@@ -2,21 +2,23 @@
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useSupabase } from '~/composables/useSupabase'
+import { useAnswers } from '~/composables/useAnswers'
 import { 
   Tv, 
   AlertCircle, 
   Volume2, 
   VolumeX, 
-  HelpCircle,
-  Award,
-  CheckCircle,
-  Play,
-  Mic,
-  MicOff
+  HelpCircle, 
+  Award, 
+  CheckCircle, 
+  Play, 
+  Mic, 
+  MicOff 
 } from 'lucide-vue-next'
 
 const route = useRoute()
 const { supabase, isConfigured } = useSupabase()
+const { fetchAllRoundAnswers } = useAnswers()
 
 const selectedRoundId = ref('')
 const roundsList = ref<any[]>([])
@@ -622,11 +624,7 @@ const loadPresentationState = async () => {
     // 2.1 Fetch all answers and questions for scoring
     if (tData && tData.length > 0) {
       const teamIds = tData.map(t => t.id)
-      const { data: aData } = await supabase.value
-        .from('answers')
-        .select('*')
-        .in('team_id', teamIds)
-      allAnswers.value = aData || []
+      allAnswers.value = await fetchAllRoundAnswers(selectedRoundId.value, teamIds)
     } else {
       allAnswers.value = []
     }

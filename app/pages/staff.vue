@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useSupabase } from '~/composables/useSupabase'
 import { useAuth } from '~/composables/useAuth'
 import { useRoundSelector } from '~/composables/useRoundSelector'
+import { useAnswers } from '~/composables/useAnswers'
 import { TOTAL_QUESTIONS } from '~/utils/constants'
 import { 
   Users, 
@@ -18,6 +19,7 @@ import type { Team, Answer } from '~/types'
 const route = useRoute()
 const { supabase, isConfigured } = useSupabase()
 const { validateStaffOrAdmin, getActivePasskey, logout } = useAuth()
+const { fetchAllRoundAnswers } = useAnswers()
 
 // Questions & Teams
 const teams = ref<Team[]>([])
@@ -167,10 +169,7 @@ const fetchAnswers = async () => {
   if (!supabase.value || teams.value.length === 0) return
   
   const teamIds = teams.value.map(t => t.id)
-  const { data } = await supabase.value
-    .from('answers')
-    .select('team_id, question_number, submitted_answer')
-    .in('team_id', teamIds)
+  const data = await fetchAllRoundAnswers(selectedRoundId.value, teamIds, 'team_id, question_number, submitted_answer')
     
   if (data) {
     const map: Record<string, string> = {}

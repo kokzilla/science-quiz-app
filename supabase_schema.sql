@@ -653,6 +653,31 @@ begin
 end;
 $$;
 
+-- 10. Add RPC function to fetch all answers for a round safely bypassing PostgREST 1000 rows limit
+create or replace function get_round_answers(p_round_id uuid)
+returns jsonb
+security definer
+language sql
+as $$
+    select coalesce(
+        jsonb_agg(
+            jsonb_build_object(
+                'id', a.id,
+                'team_id', a.team_id,
+                'question_number', a.question_number,
+                'submitted_answer', a.submitted_answer,
+                'is_correct', a.is_correct,
+                'recorded_by', a.recorded_by,
+                'updated_at', a.updated_at
+            )
+        ),
+        '[]'::jsonb
+    )
+    from answers a
+    join teams t on t.id = a.team_id
+    where t.round_id = p_round_id;
+$$;
+
 -- Notify schema reload
 notify pgrst, 'reload schema';
 

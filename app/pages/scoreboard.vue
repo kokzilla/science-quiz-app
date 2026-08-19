@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useSupabase } from '~/composables/useSupabase'
 import { useTheme } from '~/composables/useTheme'
 import { useRoundSelector } from '~/composables/useRoundSelector'
+import { useAnswers } from '~/composables/useAnswers'
 import { TOTAL_QUESTIONS } from '~/utils/constants'
 import { 
   AlertCircle, 
@@ -20,6 +21,7 @@ import type { Team, Answer, Question } from '~/types'
 const { theme, toggleTheme } = useTheme()
 const route = useRoute()
 const { supabase, isConfigured } = useSupabase()
+const { fetchAllRoundAnswers } = useAnswers()
 
 const sortBy = ref<'score' | 'team'>('score')
 const teams = ref<Team[]>([])
@@ -224,12 +226,7 @@ const loadScoreboardData = async (roundId: string) => {
     // 3. Fetch all answers for these teams
     if (tData && tData.length > 0) {
       const teamIds = tData.map(t => t.id)
-      const { data: aData } = await supabase.value
-        .from('answers')
-        .select('*')
-        .in('team_id', teamIds)
-      
-      answers.value = (aData || []) as Answer[]
+      answers.value = await fetchAllRoundAnswers(roundId, teamIds)
     } else {
       answers.value = []
     }

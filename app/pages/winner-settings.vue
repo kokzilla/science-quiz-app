@@ -5,6 +5,7 @@ import { useSupabase } from '~/composables/useSupabase'
 import { useAuth } from '~/composables/useAuth'
 import { useTheme } from '~/composables/useTheme'
 import { useRoundSelector } from '~/composables/useRoundSelector'
+import { useAnswers } from '~/composables/useAnswers'
 import { 
   Award, 
   Tv, 
@@ -28,6 +29,7 @@ const router = useRouter()
 const { supabase, isConfigured } = useSupabase()
 const { validateAdminOnly, getActivePasskey } = useAuth()
 const { theme, initTheme } = useTheme()
+const { fetchAllRoundAnswers } = useAnswers()
 
 const passkeyValid = ref(false)
 const adminPasskey = ref('')
@@ -155,11 +157,8 @@ const onRoundChanged = async (roundId: string) => {
     questions.value = (qData || []) as Question[]
 
     if (teams.value.length > 0) {
-      const { data: aData } = await supabase.value
-        .from('answers')
-        .select('*')
-        .in('team_id', teams.value.map(t => t.id))
-      answers.value = (aData || []) as Answer[]
+      const teamIds = teams.value.map(t => t.id)
+      answers.value = await fetchAllRoundAnswers(roundId, teamIds)
     } else {
       answers.value = []
     }

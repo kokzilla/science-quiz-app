@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useSupabase } from '~/composables/useSupabase'
 import { useAuth } from '~/composables/useAuth'
 import { useRoundSelector } from '~/composables/useRoundSelector'
+import { useAnswers } from '~/composables/useAnswers'
 import { TOTAL_QUESTIONS } from '~/utils/constants'
 import { 
   Award, 
@@ -21,6 +22,7 @@ import type { Team, Question, Answer } from '~/types'
 const route = useRoute()
 const { supabase, isConfigured } = useSupabase()
 const { validateStaffOrAdmin, logout } = useAuth()
+const { fetchAllRoundAnswers } = useAnswers()
 
 const teams = ref<Team[]>([])
 const questions = ref<Question[]>([])
@@ -97,11 +99,7 @@ onUnmounted(() => {
 const fetchAnswers = async () => {
   if (!supabase.value || teams.value.length === 0) return
   const teamIds = teams.value.map(t => t.id)
-  const { data } = await supabase.value
-    .from('answers')
-    .select('*')
-    .in('team_id', teamIds)
-  answers.value = (data || []) as Answer[]
+  answers.value = await fetchAllRoundAnswers(selectedRoundId.value, teamIds)
 }
 
 // Compute submitted and correct counts client-side dynamically for all 20 questions

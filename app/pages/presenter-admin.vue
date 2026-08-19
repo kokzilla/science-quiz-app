@@ -4,6 +4,7 @@ import { useRouter } from '#imports'
 import { useSupabase } from '~/composables/useSupabase'
 import { useAuth } from '~/composables/useAuth'
 import { useRoundSelector } from '~/composables/useRoundSelector'
+import { useAnswers } from '~/composables/useAnswers'
 import { TOTAL_QUESTIONS } from '~/utils/constants'
 import { 
   Sliders, 
@@ -32,6 +33,7 @@ import type { Question, Answer, Team } from '~/types'
 const router = useRouter()
 const { supabase, isConfigured } = useSupabase()
 const { validateAdminOnly, getActivePasskey } = useAuth()
+const { fetchAllRoundAnswers } = useAnswers()
 
 const questions = ref<Question[]>([])
 const answers = ref<Answer[]>([])
@@ -267,11 +269,7 @@ watch(
 const fetchAnswers = async () => {
   if (!supabase.value || teams.value.length === 0) return
   const teamIds = teams.value.map(t => t.id)
-  const { data } = await supabase.value
-    .from('answers')
-    .select('*')
-    .in('team_id', teamIds)
-  answers.value = (data || []) as Answer[]
+  answers.value = await fetchAllRoundAnswers(selectedRoundId.value, teamIds)
 }
 
 // Update presenter active question or state via secure RPC

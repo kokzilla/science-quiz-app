@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { useSupabase } from '~/composables/useSupabase'
 import { useAuth } from '~/composables/useAuth'
 import { useRoundSelector } from '~/composables/useRoundSelector'
+import { useAnswers } from '~/composables/useAnswers'
 import { TOTAL_QUESTIONS } from '~/utils/constants'
 import { 
   Tv, 
@@ -29,6 +30,7 @@ import type { Team, Question, ProgressSummary } from '~/types'
 const route = useRoute()
 const { supabase, isConfigured } = useSupabase()
 const { validateAdminOnly, getActivePasskey, logout } = useAuth()
+const { fetchAllRoundAnswers } = useAnswers()
 
 const passkeyValid = ref(false)
 const adminPasskey = ref('')
@@ -453,10 +455,7 @@ const fetchProgress = async () => {
       return
     }
 
-    const { data: answersData } = await supabase.value
-      .from('answers')
-      .select('question_number, submitted_answer')
-      .in('team_id', teamIds)
+    const answersData = await fetchAllRoundAnswers(selectedRoundId.value, teamIds, 'question_number, submitted_answer')
       
     const counts: Record<number, number> = {}
     for (let i = 1; i <= TOTAL_QUESTIONS; i++) counts[i] = 0
