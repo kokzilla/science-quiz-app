@@ -44,6 +44,7 @@ const answers = ref<Answer[]>([])
 const selectedRank1 = ref<string[]>([])
 const selectedRank2 = ref<string[]>([])
 const selectedRank3 = ref<string[]>([])
+const selectedHonorable = ref<string[]>([])
 
 // Audio & Presenter Theme settings refs
 const soundEnabled = ref(true)
@@ -126,7 +127,6 @@ const toggleTts = () => {
 }
 
 // Callback when selected round changes
-// Callback when selected round changes
 const onRoundChanged = async (roundId: string) => {
   if (!supabase.value || !roundId) {
     loading.value = false
@@ -170,6 +170,7 @@ const onRoundChanged = async (roundId: string) => {
       selectedRank1.value = (wd.rank1 || []).map((t: any) => t.id || t)
       selectedRank2.value = (wd.rank2 || []).map((t: any) => t.id || t)
       selectedRank3.value = (wd.rank3 || []).map((t: any) => t.id || t)
+      selectedHonorable.value = (wd.honorable || (wd as any).rankHonorable || []).map((t: any) => t.id || t)
     } else {
       // Auto populate initial suggestions if no winner_data saved yet
       autoCalculateWinners()
@@ -255,13 +256,14 @@ const teamsWithScores = computed(() => {
   }).sort((a, b) => b.totalScore - a.totalScore || a.team_number - b.team_number)
 })
 
-// Auto-fill top 3 ranks from highest scores
+// Auto-fill top ranks and honorable mentions from highest scores
 const autoCalculateWinners = () => {
   const sorted = [...teamsWithScores.value]
   if (sorted.length === 0) {
     selectedRank1.value = []
     selectedRank2.value = []
     selectedRank3.value = []
+    selectedHonorable.value = []
     return
   }
 
@@ -271,18 +273,21 @@ const autoCalculateWinners = () => {
   const top1Score = scores[0]
   const top2Score = scores[1]
   const top3Score = scores[2]
+  const top4Score = scores[3]
 
-  selectedRank1.value = sorted.filter(t => t.totalScore === top1Score).map(t => t.id)
+  selectedRank1.value = top1Score !== undefined ? sorted.filter(t => t.totalScore === top1Score).map(t => t.id) : []
   selectedRank2.value = top2Score !== undefined ? sorted.filter(t => t.totalScore === top2Score).map(t => t.id) : []
   selectedRank3.value = top3Score !== undefined ? sorted.filter(t => t.totalScore === top3Score).map(t => t.id) : []
+  selectedHonorable.value = top4Score !== undefined ? sorted.filter(t => t.totalScore === top4Score).map(t => t.id) : []
 
-  message.value = { text: 'คำนวณและดึงรายชื่อผู้ชนะจากคะแนนโดยอัตโนมัติเรียบร้อยแล้ว', type: 'success' }
+  message.value = { text: 'คำนวณและดึงรายชื่อผู้ชนะและรางวัลชมเชยจากคะแนนโดยอัตโนมัติเรียบร้อยแล้ว', type: 'success' }
 }
 
-const toggleTeamSelection = (rankList: 'rank1' | 'rank2' | 'rank3', teamId: string) => {
+const toggleTeamSelection = (rankList: 'rank1' | 'rank2' | 'rank3' | 'honorable', teamId: string) => {
   let targetRef = selectedRank1
   if (rankList === 'rank2') targetRef = selectedRank2
   if (rankList === 'rank3') targetRef = selectedRank3
+  if (rankList === 'honorable') targetRef = selectedHonorable
 
   const index = targetRef.value.indexOf(teamId)
   if (index > -1) {
@@ -292,10 +297,11 @@ const toggleTeamSelection = (rankList: 'rank1' | 'rank2' | 'rank3', teamId: stri
   }
 }
 
-const isTeamSelected = (rankList: 'rank1' | 'rank2' | 'rank3', teamId: string) => {
+const isTeamSelected = (rankList: 'rank1' | 'rank2' | 'rank3' | 'honorable', teamId: string) => {
   if (rankList === 'rank1') return selectedRank1.value.includes(teamId)
   if (rankList === 'rank2') return selectedRank2.value.includes(teamId)
   if (rankList === 'rank3') return selectedRank3.value.includes(teamId)
+  if (rankList === 'honorable') return selectedHonorable.value.includes(teamId)
   return false
 }
 
@@ -316,7 +322,8 @@ const buildWinnerDataPayload = () => {
   return {
     rank1: getObjects(selectedRank1.value),
     rank2: getObjects(selectedRank2.value),
-    rank3: getObjects(selectedRank3.value)
+    rank3: getObjects(selectedRank3.value),
+    honorable: getObjects(selectedHonorable.value)
   }
 }
 
@@ -482,7 +489,7 @@ const goBackAdmin = () => {
           <span>ตั้งค่าและประกาศผลผู้ชนะเลิศ</span>
         </h1>
         <p class="page-subtitle">
-          กำหนดทีมชนะเลิศ 1-3 ประจำรอบ <strong>{{ currentRound.name }}</strong> เพื่อแสดงบนแท่นรับรางวัล 3 แท่นบนจอเวที LED
+          กำหนดทีมชนะเลิศ 1-3 และรางวัลชมเชย ประจำรอบ <strong>{{ currentRound.name }}</strong> เพื่อแสดงบนแท่นรับรางวัลและจอเวที LED
         </p>
       </div>
 
@@ -537,7 +544,7 @@ const goBackAdmin = () => {
         </div>
       </div>
 
-      <!-- Main Selection Grid: 3 Rank Columns -->
+      <!-- Main Selection Grid: 4 Rank Columns -->
       <div class="ranks-grid">
         
         <!-- RANK 1 COLUMN (GOLD) -->
@@ -633,6 +640,40 @@ const goBackAdmin = () => {
               <div class="team-info-box">
                 <div class="team-header-row">
                   <span class="team-num-badge">TEAM {{ String(t.team_number).padStart(2, '0') }}</span>
+                  <span class="team-score-tag">{{ t.totalScore }} คะแนน</span>
+                </div>
+                <span class="team-title-name">{{ t.name }}</span>
+                <span v-if="t.school_name" class="team-school-name">{{ formatSchoolName(t.school_name) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- HONORABLE MENTION COLUMN -->
+        <div class="glass-card rank-card rank-honorable-card">
+          <div class="rank-card-header honorable-header">
+            <span class="rank-badge honorable-badge">🎖️ รางวัลชมเชย</span>
+            <span class="rank-count-tag">เลือกแล้ว {{ selectedHonorable.length }} ทีม</span>
+          </div>
+          <p class="rank-desc">ทีมที่ได้รับรางวัลชมเชย ประจำรอบการแข่งขัน</p>
+
+          <div class="teams-checklist">
+            <div 
+              v-for="t in teamsWithScores" 
+              :key="t.id"
+              class="team-check-item"
+              :class="{ selected: isTeamSelected('honorable', t.id) }"
+              @click="toggleTeamSelection('honorable', t.id)"
+            >
+              <input 
+                type="checkbox" 
+                :checked="isTeamSelected('honorable', t.id)" 
+                class="rank-checkbox honorable-checkbox"
+                @click.stop="toggleTeamSelection('honorable', t.id)"
+              />
+              <div class="team-info-box">
+                <div class="team-header-row">
+                  <span class="team-num-badge honorable-team-num">TEAM {{ String(t.team_number).padStart(2, '0') }}</span>
                   <span class="team-score-tag">{{ t.totalScore }} คะแนน</span>
                 </div>
                 <span class="team-title-name">{{ t.name }}</span>
@@ -776,11 +817,17 @@ const goBackAdmin = () => {
 
 .ranks-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.5rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.25rem;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 1280px) {
+  .ranks-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
   .ranks-grid {
     grid-template-columns: 1fr;
   }
@@ -790,6 +837,22 @@ const goBackAdmin = () => {
   display: flex;
   flex-direction: column;
   height: 100%;
+}
+
+.rank-1-card {
+  border-color: rgba(253, 224, 71, 0.35);
+}
+
+.rank-2-card {
+  border-color: rgba(226, 232, 240, 0.35);
+}
+
+.rank-3-card {
+  border-color: rgba(253, 186, 116, 0.35);
+}
+
+.rank-honorable-card {
+  border-color: rgba(56, 189, 248, 0.35);
 }
 
 .rank-card-header {
@@ -803,12 +866,89 @@ const goBackAdmin = () => {
 
 .rank-badge {
   font-weight: 800;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
 }
 
 .gold-badge { color: #fde047; }
 .silver-badge { color: #e2e8f0; }
 .bronze-badge { color: #fdba74; }
+.honorable-badge { color: #38bdf8; }
+
+.rank-count-tag {
+  font-size: 0.8rem;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.2rem 0.5rem;
+  border-radius: 0.25rem;
+  color: #cbd5e1;
+}
+
+.rank-desc {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  margin-bottom: 1rem;
+}
+
+.teams-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: 480px;
+  overflow-y: auto;
+  padding-right: 0.35rem;
+}
+
+.team-check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.85rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.65rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.team-check-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.rank-1-card .team-check-item.selected {
+  background: rgba(234, 179, 8, 0.14);
+  border-color: rgba(234, 179, 8, 0.5);
+}
+
+.rank-2-card .team-check-item.selected {
+  background: rgba(226, 232, 240, 0.12);
+  border-color: rgba(226, 232, 240, 0.45);
+}
+
+.rank-3-card .team-check-item.selected {
+  background: rgba(251, 146, 60, 0.14);
+  border-color: rgba(251, 146, 60, 0.45);
+}
+
+.rank-honorable-card .team-check-item.selected {
+  background: rgba(56, 189, 248, 0.14);
+  border-color: rgba(56, 189, 248, 0.5);
+}
+
+.rank-checkbox {
+  margin-top: 0.25rem;
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #eab308;
+}
+
+.honorable-checkbox {
+  accent-color: #38bdf8;
+}
+
+.honorable-team-num {
+  color: #38bdf8;
+}
 
 .rank-count-tag {
   font-size: 0.8rem;

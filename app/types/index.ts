@@ -13,6 +13,7 @@ export interface Round {
     rank1?: Team[]
     rank2?: Team[]
     rank3?: Team[]
+    honorable?: Team[]
   } | null
   created_at?: string
 }

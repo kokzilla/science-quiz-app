@@ -768,12 +768,13 @@ const speakCorrectTeams = () => {
 }
 
 const winnerData = computed(() => {
-  if (!currentRound.value?.winner_data) return { rank1: [], rank2: [], rank3: [] }
+  if (!currentRound.value?.winner_data) return { rank1: [], rank2: [], rank3: [], honorable: [] }
   const wd = currentRound.value.winner_data
   return {
     rank1: wd.rank1 || [],
     rank2: wd.rank2 || [],
-    rank3: wd.rank3 || []
+    rank3: wd.rank3 || [],
+    honorable: wd.honorable || (wd as any).rankHonorable || []
   }
 })
 
@@ -2197,10 +2198,10 @@ const handlePageClick = () => {
             </div>
           </div>
 
-          <!-- 3 Podiums Container -->
+          <!-- 4 Podiums Container -->
           <div class="podiums-stage-grid">
             
-            <!-- PODIUM 2 (LEFT - SILVER - 2ND PLACE) -->
+            <!-- PODIUM 2 (SILVER - 2ND PLACE) -->
             <div class="podium-col silver-col">
               <div class="podium-teams-cards">
                 <div v-if="!winnerData.rank2 || winnerData.rank2.length === 0" class="no-winner-slot">
@@ -2212,12 +2213,14 @@ const handlePageClick = () => {
                 </div>
               </div>
               <div class="podium-pillar silver-pillar">
-                <div class="pillar-rank-badge">🥈</div>
+                <div class="pillar-medal-disc silver-disc">
+                  <span class="medal-num">2</span>
+                </div>
                 <div class="pillar-rank-title">รองชนะเลิศ อันดับ 1</div>
               </div>
             </div>
 
-            <!-- PODIUM 1 (CENTER - GOLD - 1ST PLACE HIGHEST) -->
+            <!-- PODIUM 1 (GOLD - 1ST PLACE HIGHEST) -->
             <div class="podium-col gold-col">
               <div class="podium-crown-icon">👑</div>
               <div class="podium-teams-cards">
@@ -2230,12 +2233,14 @@ const handlePageClick = () => {
                 </div>
               </div>
               <div class="podium-pillar gold-pillar">
-                <div class="pillar-rank-badge">🥇</div>
+                <div class="pillar-medal-disc gold-disc">
+                  <span class="medal-num">1</span>
+                </div>
                 <div class="pillar-rank-title">ชนะเลิศ (อันดับ 1)</div>
               </div>
             </div>
 
-            <!-- PODIUM 3 (RIGHT - BRONZE - 3RD PLACE) -->
+            <!-- PODIUM 3 (BRONZE - 3RD PLACE) -->
             <div class="podium-col bronze-col">
               <div class="podium-teams-cards">
                 <div v-if="!winnerData.rank3 || winnerData.rank3.length === 0" class="no-winner-slot">
@@ -2247,8 +2252,29 @@ const handlePageClick = () => {
                 </div>
               </div>
               <div class="podium-pillar bronze-pillar">
-                <div class="pillar-rank-badge">🥉</div>
+                <div class="pillar-medal-disc bronze-disc">
+                  <span class="medal-num">3</span>
+                </div>
                 <div class="pillar-rank-title">รองชนะเลิศ อันดับ 2</div>
+              </div>
+            </div>
+
+            <!-- PODIUM 4 (HONORABLE MENTION - BESIDE 3RD PLACE) -->
+            <div class="podium-col honorable-col">
+              <div class="podium-teams-cards">
+                <div v-if="!winnerData.honorable || winnerData.honorable.length === 0" class="no-winner-slot">
+                  - ไม่ระบุ -
+                </div>
+                <div v-for="team in winnerData.honorable" :key="team.id" class="podium-team-card honorable-card">
+                  <div class="podium-team-name-line">{{ team.name }}</div>
+                  <div v-if="team.school_name" class="podium-team-school-line">{{ formatSchoolName(team.school_name) }}</div>
+                </div>
+              </div>
+              <div class="podium-pillar honorable-pillar">
+                <div class="pillar-medal-disc honorable-disc">
+                  <span class="medal-icon">🎖️</span>
+                </div>
+                <div class="pillar-rank-title">รางวัลชมเชย</div>
               </div>
             </div>
 
@@ -4043,19 +4069,24 @@ const handlePageClick = () => {
 
 .podiums-stage-grid {
   display: grid;
-  grid-template-columns: 1fr 1.15fr 1fr;
-  gap: 1.5rem;
+  grid-template-columns: 1fr 1.15fr 1fr 0.95fr;
+  gap: clamp(0.6rem, 1vw, 1.25rem);
   align-items: flex-end;
   flex: 1;
-  padding: 0.5rem 0;
+  padding: 0.5rem 0 0 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .podium-col {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
+  align-items: center;
   height: 100%;
   position: relative;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .gold-col {
@@ -4063,8 +4094,8 @@ const handlePageClick = () => {
 }
 
 .podium-crown-icon {
-  font-size: clamp(3.5rem, 5vw, 5.2rem);
-  margin-bottom: 0.5rem;
+  font-size: clamp(3rem, 4.5vw, 4.5rem);
+  margin-bottom: 0.35rem;
   filter: drop-shadow(0 0 15px rgba(255, 215, 0, 0.6));
   animation: bounceCrown 2s infinite ease-in-out;
 }
@@ -4074,80 +4105,97 @@ const handlePageClick = () => {
   50% { transform: translateY(-10px); }
 }
 
-/* Horizontal Row layout for tied teams (left to right) */
+/* Horizontal & 2-Row Grid layout for teams (wraps into 2nd row if > 2 teams) */
 .podium-teams-cards {
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
   justify-content: center;
   align-items: stretch;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
   width: 100%;
+  max-height: clamp(160px, 24vh, 260px);
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .no-winner-slot {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   color: #64748b;
-  padding: 1rem;
+  padding: 0.85rem;
   background: rgba(255, 255, 255, 0.03);
   border-radius: 0.75rem;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .podium-team-card {
-  flex: 1;
-  min-width: 160px;
-  max-width: 320px;
-  padding: clamp(0.7rem, 1.4vh, 1.2rem) clamp(0.9rem, 1.4vw, 1.4rem);
-  border-radius: 1rem;
+  flex: 1 1 calc(50% - 0.45rem);
+  min-width: 105px;
+  max-width: 100%;
+  padding: clamp(0.4rem, 0.8vh, 0.8rem) clamp(0.45rem, 0.8vw, 0.85rem);
+  border-radius: 0.85rem;
   backdrop-filter: blur(12px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
   transition: all 0.3s;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  box-sizing: border-box;
+}
+
+/* If only 1 team in this podium category, expand to clean full-width card */
+.podium-teams-cards:has(> :only-child) .podium-team-card {
+  flex: 0 1 95%;
+  max-width: 320px;
 }
 
 .gold-card {
   background: linear-gradient(135deg, rgba(234, 179, 8, 0.3) 0%, rgba(255, 215, 0, 0.15) 100%);
   border: 2px solid rgba(255, 215, 0, 0.7);
-  box-shadow: 0 0 30px rgba(255, 215, 0, 0.35);
+  box-shadow: 0 0 25px rgba(255, 215, 0, 0.35);
 }
 
 .silver-card {
   background: linear-gradient(135deg, rgba(226, 232, 240, 0.25) 0%, rgba(148, 163, 184, 0.15) 100%);
   border: 2px solid rgba(226, 232, 240, 0.6);
-  box-shadow: 0 0 20px rgba(226, 232, 240, 0.25);
+  box-shadow: 0 0 18px rgba(226, 232, 240, 0.25);
 }
 
 .bronze-card {
   background: linear-gradient(135deg, rgba(251, 146, 60, 0.25) 0%, rgba(217, 119, 6, 0.15) 100%);
   border: 2px solid rgba(251, 146, 60, 0.6);
-  box-shadow: 0 0 20px rgba(251, 146, 60, 0.25);
+  box-shadow: 0 0 18px rgba(251, 146, 60, 0.25);
+}
+
+.honorable-card {
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.25) 0%, rgba(2, 132, 199, 0.15) 100%);
+  border: 2px solid rgba(56, 189, 248, 0.6);
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.25);
 }
 
 .podium-team-num {
   font-weight: 900;
-  font-size: 1.1rem;
+  font-size: 1rem;
   color: var(--color-cyan, #00e5ff);
   font-family: var(--font-title);
 }
 
 .podium-team-name-line {
   font-weight: 900;
-  font-size: clamp(1.6rem, 2.5vh, 2.6rem);
+  font-size: clamp(1.5rem, 2.3vh, 2.55rem);
   color: #ffffff;
-  line-height: 1.25;
+  line-height: 1.2;
   word-break: break-word;
 }
 
 .podium-team-school-line {
-  font-size: clamp(1.15rem, 1.7vh, 1.75rem);
+  font-size: clamp(1.05rem, 1.55vh, 1.6rem);
   color: #e2e8f0;
   opacity: 0.95;
-  line-height: 1.25;
-  margin-top: 0.25rem;
+  line-height: 1.2;
+  margin-top: 0.2rem;
   word-break: break-word;
 }
 
@@ -4181,46 +4229,122 @@ const handlePageClick = () => {
 }
 
 .podium-pillar {
-  border-radius: 1rem 1rem 0 0;
+  width: 100%;
+  border-radius: 1.2rem 1.2rem 0 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: clamp(0.3rem, 0.6vh, 0.6rem);
+  padding: 1rem 0.5rem 0.5rem 0.5rem;
   box-shadow: inset 0 2px 10px rgba(255, 255, 255, 0.2), 0 15px 30px rgba(0,0,0,0.5);
+  box-sizing: border-box;
 }
 
+/* Extra Tall Podiums */
 .gold-pillar {
-  height: 190px;
-  background: linear-gradient(180deg, rgba(234, 179, 8, 0.65) 0%, rgba(161, 98, 7, 0.85) 100%);
+  height: clamp(340px, 44vh, 500px);
+  background: linear-gradient(180deg, rgba(234, 179, 8, 0.75) 0%, rgba(161, 98, 7, 0.95) 100%);
   border: 2px solid #fde047;
 }
 
 .silver-pillar {
-  height: 140px;
-  background: linear-gradient(180deg, rgba(203, 213, 225, 0.55) 0%, rgba(71, 85, 105, 0.75) 100%);
+  height: clamp(260px, 34vh, 390px);
+  background: linear-gradient(180deg, rgba(203, 213, 225, 0.65) 0%, rgba(71, 85, 105, 0.85) 100%);
   border: 2px solid #cbd5e1;
 }
 
 .bronze-pillar {
-  height: 105px;
-  background: linear-gradient(180deg, rgba(217, 119, 6, 0.55) 0%, rgba(120, 53, 15, 0.75) 100%);
+  height: clamp(195px, 25vh, 290px);
+  background: linear-gradient(180deg, rgba(217, 119, 6, 0.65) 0%, rgba(120, 53, 15, 0.85) 100%);
   border: 2px solid #fb923c;
 }
 
-/* Larger Medal Icons (3.2rem - 4.5rem) */
-.pillar-rank-badge {
-  font-size: clamp(3.2rem, 4.5vw, 4.5rem);
+.honorable-pillar {
+  height: clamp(140px, 18vh, 210px);
+  background: linear-gradient(180deg, rgba(14, 165, 233, 0.65) 0%, rgba(3, 105, 161, 0.85) 100%);
+  border: 2px solid #38bdf8;
+}
+
+/* 3D Medal Discs and Numbers */
+.pillar-medal-disc {
+  width: clamp(75px, 10vh, 125px);
+  height: clamp(75px, 10vh, 125px);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-bottom: 0.15rem;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.gold-col:hover .pillar-medal-disc,
+.silver-col:hover .pillar-medal-disc,
+.bronze-col:hover .pillar-medal-disc,
+.honorable-col:hover .pillar-medal-disc {
+  transform: scale(1.08);
+}
+
+.gold-disc {
+  background: radial-gradient(circle at 35% 30%, #fff9c4 0%, #fde047 30%, #eab308 60%, #a16207 90%, #713f12 100%);
+  border: clamp(3px, 0.5vh, 6px) solid #fef08a;
+  box-shadow: 0 0 30px rgba(250, 204, 21, 0.7), inset 0 3px 6px rgba(255, 255, 255, 0.9), inset 0 -4px 8px rgba(0, 0, 0, 0.45);
+}
+
+.silver-disc {
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #e2e8f0 30%, #cbd5e1 60%, #64748b 90%, #334155 100%);
+  border: clamp(3px, 0.5vh, 6px) solid #f8fafc;
+  box-shadow: 0 0 25px rgba(226, 232, 240, 0.6), inset 0 3px 6px rgba(255, 255, 255, 0.9), inset 0 -4px 8px rgba(0, 0, 0, 0.45);
+}
+
+.bronze-disc {
+  background: radial-gradient(circle at 35% 30%, #ffedd5 0%, #fdba74 30%, #f97316 60%, #c2410c 90%, #7c2d12 100%);
+  border: clamp(3px, 0.5vh, 6px) solid #fed7aa;
+  box-shadow: 0 0 25px rgba(251, 146, 60, 0.6), inset 0 3px 6px rgba(255, 255, 255, 0.9), inset 0 -4px 8px rgba(0, 0, 0, 0.45);
+}
+
+.honorable-disc {
+  background: radial-gradient(circle at 35% 30%, #e0f2fe 0%, #7dd3fc 30%, #0284c7 60%, #0369a1 90%, #082f49 100%);
+  border: clamp(3px, 0.5vh, 6px) solid #bae6fd;
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.6), inset 0 3px 6px rgba(255, 255, 255, 0.9), inset 0 -4px 8px rgba(0, 0, 0, 0.45);
+}
+
+.medal-num {
+  font-family: var(--font-title), sans-serif;
+  font-weight: 900;
+  font-size: clamp(3.2rem, 7vh, 5.6rem);
   line-height: 1;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+  color: #ffffff;
+  text-shadow: 0 3px 8px rgba(0, 0, 0, 0.65), 0 0 16px rgba(255, 255, 255, 0.4);
+  letter-spacing: -1px;
+}
+
+.medal-icon {
+  font-size: clamp(2.4rem, 5.5vh, 4.2rem);
+  line-height: 1;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.5));
 }
 
 .pillar-rank-title {
-  font-weight: 800;
-  font-size: 1.05rem;
+  font-weight: 900;
+  font-size: clamp(1.05rem, 1.7vh, 1.55rem);
   color: #ffffff;
   font-family: var(--font-title);
-  text-shadow: 0 2px 4px rgba(0,0,0,0.6);
+  text-shadow: 0 2px 5px rgba(0,0,0,0.7);
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+}
+
+.light-theme .honorable-card {
+  background: linear-gradient(135deg, rgba(224, 242, 254, 0.9) 0%, rgba(186, 230, 253, 0.7) 100%);
+  border: 2px solid rgba(2, 132, 199, 0.5);
+  box-shadow: 0 4px 15px rgba(2, 132, 199, 0.15);
+}
+
+.light-theme .honorable-pillar {
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.7) 0%, rgba(2, 132, 199, 0.9) 100%);
+  border: 2px solid #0284c7;
 }
 
 /* ==========================================================================

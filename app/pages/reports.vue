@@ -10,9 +10,11 @@ import {
   Printer, 
   Download, 
   Check, 
-  AlertCircle,
-  Award,
-  Grid
+  AlertCircle, 
+  Award, 
+  Grid,
+  Sparkles,
+  LogOut
 } from 'lucide-vue-next'
 import type { Team, Question, Answer } from '~/types'
 
@@ -25,7 +27,7 @@ const questions = ref<Question[]>([])
 const answers = ref<Answer[]>([])
 
 const loading = ref(true)
-const activeReportTab = ref<'rankings' | 'crosstab' | 'item-analysis'>('rankings')
+const activeReportTab = ref<'winners' | 'rankings' | 'crosstab' | 'item-analysis'>('winners')
 const passkeyValid = ref(false)
 
 // Callback when selected round changes
@@ -81,6 +83,13 @@ onMounted(async () => {
   if (!isValid) return
   passkeyValid.value = true
 })
+
+const formatSchoolName = (schoolName?: string | null) => {
+  if (!schoolName) return ''
+  const trimmed = schoolName.trim()
+  if (trimmed.startsWith('โรงเรียน')) return trimmed
+  return `โรงเรียน${trimmed}`
+}
 
 // ==========================================
 // REPORT CALCULATIONS
@@ -138,6 +147,69 @@ const rankings = computed(() => {
   }
 
   return rankedList
+})
+
+// 0. Winners & Honorable mentions calculation (from winner_data or auto-scores)
+const winnersReport = computed(() => {
+  const wd = currentRound.value?.winner_data
+  
+  // Helper to enrich a team list with latest scores from rankings
+  const enrichTeams = (teamList: any[]) => {
+    return (teamList || []).map(t => {
+      const match = rankings.value.find(r => r.id === (t.id || t))
+      return {
+        id: t.id || t,
+        team_number: match?.team_number ?? t.team_number,
+        name: match?.name ?? t.name,
+        school_name: match?.school_name ?? t.school_name,
+        correctCount: match?.correctCount ?? 0,
+        wrongCount: match?.wrongCount ?? 0,
+        unansweredCount: match?.unansweredCount ?? 0,
+        tie_breaker_score: match?.tie_breaker_score ?? t.tie_breaker_score ?? 0,
+        finalScore: match?.finalScore ?? (match?.correctCount || 0)
+      }
+    })
+  }
+
+  if (wd && (
+    (wd.rank1 && wd.rank1.length > 0) || 
+    (wd.rank2 && wd.rank2.length > 0) || 
+    (wd.rank3 && wd.rank3.length > 0) || 
+    (wd.honorable && wd.honorable.length > 0) ||
+    ((wd as any).rankHonorable && (wd as any).rankHonorable.length > 0)
+  )) {
+    return {
+      isCustomSet: true,
+      rank1: enrichTeams(wd.rank1 || []),
+      rank2: enrichTeams(wd.rank2 || []),
+      rank3: enrichTeams(wd.rank3 || []),
+      honorable: enrichTeams(wd.honorable || (wd as any).rankHonorable || [])
+    }
+  }
+
+  // Fallback to top score groups from rankings if winner_data is not set
+  const sorted = [...rankings.value]
+  const scores = Array.from(new Set(sorted.map(t => t.finalScore))).sort((a, b) => b - a)
+
+  const top1Score = scores[0]
+  const top2Score = scores[1]
+  const top3Score = scores[2]
+  const top4Score = scores[3]
+
+  return {
+    isCustomSet: false,
+    rank1: top1Score !== undefined ? sorted.filter(t => t.finalScore === top1Score) : [],
+    rank2: top2Score !== undefined ? sorted.filter(t => t.finalScore === top2Score) : [],
+    rank3: top3Score !== undefined ? sorted.filter(t => t.finalScore === top3Score) : [],
+    honorable: top4Score !== undefined ? sorted.filter(t => t.finalScore === top4Score) : []
+  }
+})
+
+const hasAnyWinners = computed(() => {
+  return winnersReport.value.rank1.length > 0 ||
+         winnersReport.value.rank2.length > 0 ||
+         winnersReport.value.rank3.length > 0 ||
+         winnersReport.value.honorable.length > 0
 })
 
 const crosstabSortBy = ref<'score' | 'team'>('score')
@@ -216,10 +288,21 @@ const handleExportCSV = () => {
 
   let csvContent = 'data:text/csv;charset=utf-8,\uFEFF' // UTF-8 BOM
   
-  if (activeReportTab.value === 'rankings') {
-    csvContent += 'Rank,Team Number,Team Name,Correct Answers,Wrong Answers,Unanswered,Total Score\n'
+  if (activeReportTab.value === 'winners') {
+    csvContent += 'Award Category,Rank,Team Number,Team Name,School Name,Correct Answers,Wrong Answers,Unanswered,Total Score\n'
+    const addCategory = (categoryName: string, rankNum: number | string, list: any[]) => {
+      list.forEach(row => {
+        csvContent += `"${categoryName}",${rankNum},${row.team_number},"${(row.name || '').replace(/"/g, '""')}","${(row.school_name || '').replace(/"/g, '""')}",${row.correctCount || 0},${row.wrongCount || 0},${row.unansweredCount || 0},${row.finalScore || 0}\n`
+      })
+    }
+    addCategory('ชนะเลิศ (อันดับ 1)', 1, winnersReport.value.rank1)
+    addCategory('รองชนะเลิศ อันดับ 1', 2, winnersReport.value.rank2)
+    addCategory('รองชนะเลิศ อันดับ 2', 3, winnersReport.value.rank3)
+    addCategory('รางวัลชมเชย', 'ชมเชย', winnersReport.value.honorable)
+  } else if (activeReportTab.value === 'rankings') {
+    csvContent += 'Rank,Team Number,Team Name,School Name,Correct Answers,Wrong Answers,Unanswered,Total Score\n'
     rankings.value.forEach(row => {
-      csvContent += `${row.rank},${row.team_number},"${row.name.replace(/"/g, '""')}",${row.correctCount},${row.wrongCount},${row.unansweredCount},${row.finalScore}\n`
+      csvContent += `${row.rank},${row.team_number},"${row.name.replace(/"/g, '""')}","${(row.school_name || '').replace(/"/g, '""')}",${row.correctCount},${row.wrongCount},${row.unansweredCount},${row.finalScore}\n`
     })
   } else if (activeReportTab.value === 'item-analysis') {
     csvContent += 'Question Number,Correct Choice,Correct Answers,Wrong Answers,Unanswered Count,Correctness Percentage\n'
@@ -238,7 +321,7 @@ const handleExportCSV = () => {
   const encodedUri = encodeURI(csvContent)
   const link = document.createElement('a')
   link.setAttribute('href', encodedUri)
-  link.setAttribute('download', `quiz_report_${currentRound.value?.name || 'export'}.csv`)
+  link.setAttribute('download', `quiz_report_${activeReportTab.value}_${currentRound.value?.name || 'export'}.csv`)
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
@@ -299,12 +382,21 @@ const handleExportCSV = () => {
       <!-- Report Tabs (No Print) -->
       <div class="no-print tabs-row">
         <button 
+          @click="activeReportTab = 'winners'" 
+          class="btn tab-btn" 
+          :class="{ active: activeReportTab === 'winners' }"
+        >
+          <Award :size="16" />
+          <span>🏆 ผู้ชนะเลิศและรางวัลชมเชย</span>
+        </button>
+
+        <button 
           @click="activeReportTab = 'rankings'" 
           class="btn tab-btn" 
           :class="{ active: activeReportTab === 'rankings' }"
         >
-          <Award :size="16" />
-          <span>สรุปทำเนียบผู้ชนะและอันดับ</span>
+          <BarChart3 :size="16" />
+          <span>สรุปทำเนียบอันดับคะแนน</span>
         </button>
 
         <button 
@@ -333,6 +425,101 @@ const handleExportCSV = () => {
 
       <div v-else class="glass-card report-data-card">
         
+        <!-- Tab 0: Winners & Honorable Mentions (Compact View without column headers) -->
+        <div v-if="activeReportTab === 'winners'" class="compact-winners-container">
+          <div class="winners-top-bar no-print">
+            <h2 class="section-title">🏆 สรุปผลรางวัลการแข่งขัน</h2>
+            <div class="winner-source-tag">
+              <span v-if="winnersReport.isCustomSet" class="source-badge custom-badge">
+                <Check :size="14" />
+                <span>ผลรางวัลอย่างเป็นทางการ</span>
+              </span>
+              <span v-else class="source-badge auto-badge">
+                <Sparkles :size="14" />
+                <span>คำนวณตามคะแนนรวมอัตโนมัติ</span>
+              </span>
+            </div>
+          </div>
+
+          <div v-if="!hasAnyWinners" class="no-award-teams">
+            - ยังไม่มีข้อมูลทีมในรอบนี้ -
+          </div>
+
+          <div v-else class="table-responsive">
+            <table class="report-table compact-winners-table">
+              <tbody>
+                <!-- 1. ชนะเลิศ -->
+                <tr v-for="team in winnersReport.rank1" :key="'r1-'+team.id" class="gold-award-row">
+                  <td class="award-cell">
+                    <span class="award-pill gold-pill">🥇 รางวัลชนะเลิศ</span>
+                  </td>
+                  <td class="team-num-cell">
+                    <span class="team-badge gold-team-badge">TEAM {{ String(team.team_number).padStart(2, '0') }}</span>
+                  </td>
+                  <td class="team-info-cell">
+                    <span class="winner-team-name">{{ team.name }}</span>
+                    <span v-if="team.school_name" class="winner-school-name">{{ formatSchoolName(team.school_name) }}</span>
+                  </td>
+                  <td class="score-cell right-text gold-score">
+                    {{ team.finalScore }} คะแนน
+                  </td>
+                </tr>
+
+                <!-- 2. รองชนะเลิศ อันดับ 1 -->
+                <tr v-for="team in winnersReport.rank2" :key="'r2-'+team.id" class="silver-award-row">
+                  <td class="award-cell">
+                    <span class="award-pill silver-pill">🥈 รองชนะเลิศ อันดับ 1</span>
+                  </td>
+                  <td class="team-num-cell">
+                    <span class="team-badge silver-team-badge">TEAM {{ String(team.team_number).padStart(2, '0') }}</span>
+                  </td>
+                  <td class="team-info-cell">
+                    <span class="winner-team-name">{{ team.name }}</span>
+                    <span v-if="team.school_name" class="winner-school-name">{{ formatSchoolName(team.school_name) }}</span>
+                  </td>
+                  <td class="score-cell right-text silver-score">
+                    {{ team.finalScore }} คะแนน
+                  </td>
+                </tr>
+
+                <!-- 3. รองชนะเลิศ อันดับ 2 -->
+                <tr v-for="team in winnersReport.rank3" :key="'r3-'+team.id" class="bronze-award-row">
+                  <td class="award-cell">
+                    <span class="award-pill bronze-pill">🥉 รองชนะเลิศ อันดับ 2</span>
+                  </td>
+                  <td class="team-num-cell">
+                    <span class="team-badge bronze-team-badge">TEAM {{ String(team.team_number).padStart(2, '0') }}</span>
+                  </td>
+                  <td class="team-info-cell">
+                    <span class="winner-team-name">{{ team.name }}</span>
+                    <span v-if="team.school_name" class="winner-school-name">{{ formatSchoolName(team.school_name) }}</span>
+                  </td>
+                  <td class="score-cell right-text bronze-score">
+                    {{ team.finalScore }} คะแนน
+                  </td>
+                </tr>
+
+                <!-- 4. รางวัลชมเชย -->
+                <tr v-for="team in winnersReport.honorable" :key="'rh-'+team.id" class="honorable-award-row">
+                  <td class="award-cell">
+                    <span class="award-pill honorable-pill">🎖️ รางวัลชมเชย</span>
+                  </td>
+                  <td class="team-num-cell">
+                    <span class="team-badge honorable-team-badge">TEAM {{ String(team.team_number).padStart(2, '0') }}</span>
+                  </td>
+                  <td class="team-info-cell">
+                    <span class="winner-team-name">{{ team.name }}</span>
+                    <span v-if="team.school_name" class="winner-school-name">{{ formatSchoolName(team.school_name) }}</span>
+                  </td>
+                  <td class="score-cell right-text honorable-score">
+                    {{ team.finalScore }} คะแนน
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- Tab 1: Leaderboard and Rankings -->
         <div v-if="activeReportTab === 'rankings'">
           <div class="crosstab-header-row">
@@ -931,4 +1118,250 @@ const handleExportCSV = () => {
   color: var(--color-cyan);
   font-weight: 800;
 }
+
+/* ==========================================================================
+   COMPACT WINNERS & HONORABLE MENTION REPORT TAB STYLES
+   ========================================================================== */
+.compact-winners-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.winners-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.winner-source-tag {
+  display: flex;
+  align-items: center;
+}
+
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.source-badge.custom-badge {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #4ade80;
+}
+
+.source-badge.auto-badge {
+  background: rgba(0, 229, 255, 0.15);
+  border: 1px solid rgba(0, 229, 255, 0.4);
+  color: var(--color-cyan);
+}
+
+.no-award-teams {
+  padding: 2.5rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 1rem;
+}
+
+.compact-winners-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 0.6rem;
+  margin-bottom: 0;
+}
+
+.compact-winners-table tbody tr {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--glass-border);
+  transition: all var(--transition-fast);
+}
+
+.compact-winners-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.compact-winners-table td {
+  padding: 0.85rem 1.25rem;
+  vertical-align: middle;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.compact-winners-table td:first-child {
+  border-left: 1px solid rgba(255, 255, 255, 0.05);
+  border-top-left-radius: var(--radius-md);
+  border-bottom-left-radius: var(--radius-md);
+}
+
+.compact-winners-table td:last-child {
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  border-top-right-radius: var(--radius-md);
+  border-bottom-right-radius: var(--radius-md);
+}
+
+.award-cell {
+  width: 230px;
+  white-space: nowrap;
+}
+
+.award-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 800;
+  font-size: 0.95rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+}
+
+.gold-pill {
+  background: rgba(255, 214, 0, 0.15);
+  border-color: rgba(255, 214, 0, 0.45);
+  color: var(--color-gold, #fde047);
+}
+
+.silver-pill {
+  background: rgba(224, 224, 224, 0.15);
+  border-color: rgba(224, 224, 224, 0.4);
+  color: var(--color-silver, #e2e8f0);
+}
+
+.bronze-pill {
+  background: rgba(205, 127, 50, 0.15);
+  border-color: rgba(205, 127, 50, 0.4);
+  color: var(--color-bronze, #fdba74);
+}
+
+.honorable-pill {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+}
+
+.team-num-cell {
+  width: 120px;
+  white-space: nowrap;
+}
+
+.team-badge {
+  font-family: var(--font-title);
+  font-weight: 800;
+  font-size: 0.95rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-cyan, #00e5ff);
+}
+
+.gold-team-badge { color: var(--color-gold, #fde047); }
+.silver-team-badge { color: var(--color-silver, #e2e8f0); }
+.bronze-team-badge { color: var(--color-bronze, #fdba74); }
+.honorable-team-badge { color: #38bdf8; }
+
+.team-info-cell {
+  min-width: 250px;
+}
+
+.winner-team-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--text-primary);
+  margin-right: 0.5rem;
+}
+
+.winner-school-name {
+  font-weight: 400;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.score-cell {
+  width: 140px;
+  font-family: var(--font-title);
+  font-weight: 800;
+  font-size: 1.15rem;
+  white-space: nowrap;
+}
+
+.gold-score { color: var(--color-gold, #fde047) !important; }
+.silver-score { color: var(--color-silver, #e2e8f0) !important; }
+.bronze-score { color: var(--color-bronze, #fdba74) !important; }
+.honorable-score { color: #38bdf8 !important; }
+
+.gold-award-row {
+  border-left: 3px solid var(--color-gold) !important;
+}
+
+.silver-award-row {
+  border-left: 3px solid var(--color-silver) !important;
+}
+
+.bronze-award-row {
+  border-left: 3px solid var(--color-bronze) !important;
+}
+
+.honorable-award-row {
+  border-left: 3px solid #38bdf8 !important;
+}
+
+/* Light Theme support */
+:global(.light-theme) .compact-winners-table tbody tr {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.1);
+}
+
+:global(.light-theme) .compact-winners-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+:global(.light-theme) .gold-pill {
+  background: rgba(245, 127, 23, 0.15);
+  border-color: #f57f17;
+  color: #d97706;
+}
+
+:global(.light-theme) .silver-pill {
+  background: rgba(148, 163, 184, 0.2);
+  border-color: #64748b;
+  color: #475569;
+}
+
+:global(.light-theme) .bronze-pill {
+  background: rgba(205, 127, 50, 0.15);
+  border-color: #cd7f32;
+  color: #b45309;
+}
+
+:global(.light-theme) .honorable-pill {
+  background: rgba(2, 132, 199, 0.15);
+  border-color: rgba(2, 132, 199, 0.35);
+  color: #0284c7;
+}
+
+:global(.light-theme) .winner-school-name {
+  color: #64748b;
+}
+
+:global(.light-theme) .team-badge {
+  background: #f1f5f9;
+}
+
+:global(.light-theme) .gold-team-badge { color: #d97706; }
+:global(.light-theme) .silver-team-badge { color: #475569; }
+:global(.light-theme) .bronze-team-badge { color: #b45309; }
+:global(.light-theme) .honorable-team-badge { color: #0284c7; }
+
+:global(.light-theme) .gold-score { color: #d97706 !important; }
+:global(.light-theme) .silver-score { color: #475569 !important; }
+:global(.light-theme) .bronze-score { color: #b45309 !important; }
+:global(.light-theme) .honorable-score { color: #0284c7 !important; }
 </style>
